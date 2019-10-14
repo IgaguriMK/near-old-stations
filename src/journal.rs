@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::env::var;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
@@ -10,14 +11,18 @@ use tiny_fail::Fail;
 
 use crate::coords::Coords;
 
-pub fn load_current_location() -> Result<Location, Fail> {
+const VISITED_VIEW_FILES: usize = 10;
+
+pub fn load_current_location() -> Result<(Location, HashSet<u64>), Fail> {
     let mut journal_files = journal_files()?;
     let mut buf = String::new();
+
+    let mut location = Option::<Location>::None;
+    let mut visited_stations = HashSet::<u64>::new();
 
     while let Some(file_path) = journal_files.pop() {
         let f = File::open(&file_path)?;
         let mut r = BufReader::new(f);
-        let mut location = Option::<Location>::None;
 
         loop {
             r.read_line(&mut buf)?;
@@ -26,18 +31,54 @@ pub fn load_current_location() -> Result<Location, Fail> {
             }
 
             let event: Event = from_str(&buf).map_err(|e| Fail::new(format!("{}: {}", e, buf)))?;
-            if let Some(loc) = event.into_option() {
-                location = Some(loc);
-            }
             buf.truncate(0);
+            match event {
+                Event::Location(loc) => location = Some(loc),
+                Event::FSDJump(loc) => location = Some(loc),
+                Event::Docked(docked) => {
+                    visited_stations.insert(docked.market_id);
+                }
+                _ => {}
+            }
         }
 
-        if let Some(loc) = location {
-            return Ok(loc);
+        if location.is_some() {
+            break;
         }
     }
 
-    Err(Fail::new("No location entry"))
+    let mut cnt = VISITED_VIEW_FILES;
+    while let Some(file_path) = journal_files.pop() {
+        if cnt == 0 {
+            break;
+        }
+        cnt -= 1;
+
+        let f = File::open(&file_path)?;
+        let mut r = BufReader::new(f);
+
+        loop {
+            r.read_line(&mut buf)?;
+            if buf.is_empty() {
+                break;
+            }
+
+            let event: Event = from_str(&buf).map_err(|e| Fail::new(format!("{}: {}", e, buf)))?;
+            buf.truncate(0);
+            match event {
+                Event::Docked(docked) => {
+                    visited_stations.insert(docked.market_id);
+                }
+                _ => {}
+            }
+        }
+    }
+
+    if let Some(loc) = location {
+        Ok((loc, visited_stations))
+    } else {
+        Err(Fail::new("No location entry"))
+    }
 }
 
 fn journal_files() -> Result<Vec<PathBuf>, Fail> {
@@ -82,18 +123,9 @@ fn journal_dir() -> Result<PathBuf, Fail> {
 enum Event {
     Location(Location),
     FSDJump(Location),
+    Docked(Docked),
     #[serde(other)]
     Other,
-}
-
-impl Event {
-    fn into_option(self) -> Option<Location> {
-        match self {
-            Event::Location(l) => Some(l),
-            Event::FSDJump(l) => Some(l),
-            _ => None,
-        }
-    }
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize)]
@@ -101,4 +133,11 @@ impl Event {
 pub struct Location {
     pub star_system: String,
     pub star_pos: Coords,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+struct Docked {
+    #[serde(rename = "MarketID")]
+    market_id: u64,
+    timestamp: String,
 }

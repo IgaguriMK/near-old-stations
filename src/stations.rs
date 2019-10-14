@@ -60,6 +60,7 @@ pub struct Station {
     pub name: String,
     #[serde(rename = "type")]
     pub st_type: String,
+    pub market_id: Option<u64>,
     pub update_time: UpdateTime,
 }
 
