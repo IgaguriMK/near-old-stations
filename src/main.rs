@@ -61,13 +61,14 @@ fn w_main() -> Result<(), Fail> {
     }
 
     entries.sort_by_key(|entry| entry.score());
+    entries.reverse();
 
     for (i, e) in entries.iter().enumerate() {
         if i == cfg.max_entries {
             break;
         }
         println!(
-            "{:<2}{:.2}\t{}d\t{:<30}\t[{}]",
+            "{:<2}{:>6.2}  {}d\t{:<30}\t[{}]",
             if e.visited { "*" } else { " " },
             e.dist,
             e.days,
@@ -89,6 +90,10 @@ struct Entry {
 
 impl Entry {
     fn score(&self) -> u64 {
-        ((self.days as f64) / self.dist) as u64
+        if self.dist < 0.01 {
+            std::u64::MAX
+        } else {
+            ((self.days as f64) / self.dist) as u64
+        }
     }
 }
