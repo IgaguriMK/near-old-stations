@@ -1,6 +1,5 @@
 use std::fs::File;
 use std::io::{BufRead, BufReader};
-use std::path::Path;
 
 use chrono::{DateTime, TimeZone, Utc};
 use serde::Deserialize;
@@ -9,11 +8,8 @@ use tiny_fail::Fail;
 
 use crate::coords::Coords;
 
-pub fn load_stations<P: AsRef<Path>>(path: P) -> Result<Vec<Station>, Fail> {
-    let mut file_path = path.as_ref().to_owned();
-    file_path.push("systemsPopulated.json");
-
-    let f = File::open(&file_path)?;
+pub fn load_stations() -> Result<Vec<Station>, Fail> {
+    let f = File::open("./systemsPopulated.json")?;
     let mut r = BufReader::new(f);
 
     let mut list = Vec::new();

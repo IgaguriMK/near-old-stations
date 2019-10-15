@@ -1,5 +1,6 @@
 mod config;
 mod coords;
+mod download;
 mod journal;
 mod stations;
 
@@ -25,7 +26,10 @@ fn w_main() -> Result<(), Fail> {
 
     let (location, visited_stations) =
         journal::load_current_location().err_msg("failed load journals")?;
-    let sts = load_stations(&cfg.dumps_dir).err_msg("failed load dump file")?;
+
+    download::download().err_msg("failed download dump file")?;
+    let sts = load_stations().err_msg("failed load dump file")?;
+    eprintln!("here");
 
     let now = Utc::now();
     let mut entries = Vec::<Entry>::new();

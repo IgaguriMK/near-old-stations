@@ -7,7 +7,6 @@ use toml::from_slice;
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct Config {
-    pub dumps_dir: String,
     pub max_dist: f64,
     pub days: i64,
     pub max_entries: usize,
