@@ -1,5 +1,5 @@
 [package]
-name = "near-old-station"
+name = "near-old-stations"
 version = "0.1.0"
 authors = ["Igaguri <igagurimk@gmail.com>"]
 edition = "2018"
