@@ -75,7 +75,6 @@ impl Downloader {
         let res = req.send()?;
 
         if res.status().as_u16() == 304 {
-            println!("{}: No update.", target.name()?);
             return Ok(());
         }
 
