@@ -8,7 +8,7 @@ use chrono::Utc;
 use regex::RegexSet;
 use tiny_fail::{ErrorMessageExt, Fail};
 
-use stations::{load_stations, Station};
+use stations::{load_stations, Station, Outdated};
 
 fn main() {
     if let Err(e) = w_main() {
@@ -24,11 +24,11 @@ fn w_main() -> Result<(), Fail> {
     let exclude_systems =
         RegexSet::new(&cfg.exclude_systems).err_msg("failed parse 'exclude_systems'")?;
 
-    let (location, visited_stations) =
-        journal::load_current_location().err_msg("failed load journals")?;
-
     download::download().err_msg("failed download dump file")?;
     let sts = load_stations().err_msg("failed load dump file")?;
+
+    let (location, visited_stations) =
+        journal::load_current_location().err_msg("failed load journals")?;
 
     let now = Utc::now();
     let mut entries = Vec::<Entry>::new();
@@ -38,8 +38,8 @@ fn w_main() -> Result<(), Fail> {
             continue;
         }
 
-        let days = now.signed_duration_since(st.updated_at()?).num_days();
-        if days < cfg.days {
+        let outdated = st.outdated(now, cfg.days)?;
+        if ! outdated.is_outdated() {
             continue;
         }
 
@@ -54,11 +54,13 @@ fn w_main() -> Result<(), Fail> {
             .market_id
             .map(|id| visited_stations.contains(&id))
             .unwrap_or(false);
+        let distance_to_arrival = st.distance_to_arrival;
 
         entries.push(Entry {
             st,
-            days,
+            outdated,
             dist,
+            distance_to_arrival,
             visited,
         });
     }
@@ -71,10 +73,12 @@ fn w_main() -> Result<(), Fail> {
             break;
         }
         println!(
-            "{:<2}{:>6.2}  {}d\t{:<30}\t[{}]",
+            "{:<2}{:>6.2} Ly + {:>8} Ls  {}d [{}]  {:<25}  {}",
             if e.visited { "*" } else { " " },
             e.dist,
-            e.days,
+            si_fmt(e.distance_to_arrival),
+            e.outdated.days().unwrap(),
+            e.outdated,
             e.st.name,
             e.st.system_name
         );
@@ -83,11 +87,23 @@ fn w_main() -> Result<(), Fail> {
     Ok(())
 }
 
+fn si_fmt(x: Option<f64>) -> String {
+    match x {
+        None => "unknown".to_owned(),
+        Some(x) if x < 100.0 => format!("{:.2}", x),
+        Some(x) if x < 1000.0 => format!("{:.1}", x),
+        Some(x) if x < 10000.0 => format!("{:.2}k", x / 1000.0),
+        Some(x) if x < 100000.0 => format!("{:.1}k", x / 1000.0),
+        Some(x) => format!("{:.0}k", x / 1000.0),
+    }
+}
+
 #[derive(Debug)]
 struct Entry {
     st: Station,
-    days: i64,
+    outdated: Outdated,
     dist: f64,
+    distance_to_arrival: Option<f64>,
     visited: bool,
 }
 
@@ -96,7 +112,7 @@ impl Entry {
         if self.dist < 0.01 {
             std::u64::MAX
         } else {
-            ((self.days as f64) / self.dist) as u64
+            ((self.outdated.days().unwrap() as f64) / self.dist) as u64
         }
     }
 }
