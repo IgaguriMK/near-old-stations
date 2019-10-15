@@ -31,9 +31,18 @@ fn w_main() -> Result<(), Fail> {
     download::download().err_msg("failed download dump file")?;
     let sts = load_stations().err_msg("failed load dump file")?;
 
+    let mut last_location = None;
+
     loop {
         let (location, visited_stations) =
             journal::load_current_location().err_msg("failed load journals")?;
+
+        if let Some(ref last_loc) = last_location {
+            if last_loc == &location {
+                sleep(Duration::from_secs(10));
+                continue;
+            }
+        }
 
         let now = Utc::now();
         let mut entries = Vec::<Entry>::new();
@@ -73,6 +82,9 @@ fn w_main() -> Result<(), Fail> {
         entries.sort_by_key(|entry| entry.score());
         entries.reverse();
 
+        if cfg.mode == Mode::Update {
+            println!("\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n");
+        }
         for (i, e) in entries.iter().enumerate() {
             if i == cfg.max_entries {
                 break;
@@ -92,8 +104,8 @@ fn w_main() -> Result<(), Fail> {
         match cfg.mode {
             Mode::Oneshot => return Ok(()),
             Mode::Update => {
-                sleep(Duration::from_secs(5));
-                println!("\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n");
+                last_location = Some(location);
+                sleep(Duration::from_secs(10));
             }
         }
     }

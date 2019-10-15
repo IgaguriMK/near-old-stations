@@ -7,4 +7,4 @@ set -eu
 cargo b --release
 mkdir release
 cp target/release/near-old-stations.exe release/
-cp config.toml.sample release/config.toml
+cp config.sample.toml release/config.toml

@@ -31,7 +31,7 @@ impl Config {
     }
 }
 
-#[derive(Debug, Clone, Copy, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Mode {
     Oneshot,
