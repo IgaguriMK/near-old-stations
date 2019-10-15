@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use progress::{Bar, SpinningCircle};
-use reqwest::header::{HeaderMap, IF_NONE_MATCH, USER_AGENT, ETAG};
+use reqwest::header::{HeaderMap, ETAG, IF_NONE_MATCH, USER_AGENT};
 use reqwest::Client;
 use serde_json::{from_reader, to_writer_pretty};
 use tiny_fail::{ErrorMessageExt, Fail};

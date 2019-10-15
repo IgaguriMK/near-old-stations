@@ -11,6 +11,8 @@ pub struct Config {
     pub days: i64,
     pub max_entries: usize,
     #[serde(default)]
+    pub mode: Mode,
+    #[serde(default)]
     pub excludes: Vec<String>,
     #[serde(default)]
     pub exclude_systems: Vec<String>,
@@ -26,5 +28,18 @@ impl Config {
 
         let cfg = from_slice(&bytes).err_msg("failed parse config")?;
         Ok(cfg)
+    }
+}
+
+#[derive(Debug, Clone, Copy, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Mode {
+    Oneshot,
+    Update,
+}
+
+impl Default for Mode {
+    fn default() -> Mode {
+        Mode::Oneshot
     }
 }

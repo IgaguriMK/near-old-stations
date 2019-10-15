@@ -98,14 +98,17 @@ fn parse_and_check(now: DateTime<Utc>, days_thres: i64, s: &str) -> Result<Optio
     }
 }
 
-fn map_parse_and_check(now: DateTime<Utc>, days_thres: i64, s: Option<&String>) -> Result<Option<i64>, Fail> {
+fn map_parse_and_check(
+    now: DateTime<Utc>,
+    days_thres: i64,
+    s: Option<&String>,
+) -> Result<Option<i64>, Fail> {
     if let Some(s) = s {
         parse_and_check(now, days_thres, s)
     } else {
         Ok(None)
     }
 }
-
 
 #[derive(Debug, Default, Clone, Copy)]
 pub struct Outdated {
