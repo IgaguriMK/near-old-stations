@@ -29,7 +29,6 @@ fn w_main() -> Result<(), Fail> {
 
     download::download().err_msg("failed download dump file")?;
     let sts = load_stations().err_msg("failed load dump file")?;
-    eprintln!("here");
 
     let now = Utc::now();
     let mut entries = Vec::<Entry>::new();
