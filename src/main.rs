@@ -1,4 +1,3 @@
-
 use std::thread::sleep;
 use std::time::Duration;
 
@@ -111,8 +110,8 @@ fn w_main() -> Result<(), Fail> {
 fn si_fmt(x: Option<f64>) -> String {
     match x {
         None => "unknown".to_owned(),
-        Some(x) if x < 100.0 => format!("{:.2}", x),
-        Some(x) if x < 1000.0 => format!("{:.1}", x),
+        Some(x) if x < 100.0 => format!("{:.2} ", x),
+        Some(x) if x < 1000.0 => format!("{:.1} ", x),
         Some(x) if x < 10000.0 => format!("{:.2}k", x / 1000.0),
         Some(x) if x < 100000.0 => format!("{:.1}k", x / 1000.0),
         Some(x) => format!("{:.0}k", x / 1000.0),
