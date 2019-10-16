@@ -171,3 +171,15 @@ impl fmt::Display for Outdated {
         Ok(())
     }
 }
+
+#[test]
+fn outdated_days() {
+    let outdated = Outdated{
+        information: Some(1),
+        market: Some(2),
+        shipyard: Some(3),
+        outfitting: Some(4),
+    };
+
+    assert_eq!(outdated.days(), Some(4));
+}
