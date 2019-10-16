@@ -37,8 +37,8 @@ fn w_main() -> Result<(), Fail> {
         let (location, visited_stations) =
             journal::load_current_location().err_msg("failed load journals")?;
 
-        if let Some(ref last_loc) = last_location {
-            if last_loc == &location {
+        if let Some((ref last_loc, docked_cnt)) = last_location {
+            if last_loc == &location && docked_cnt == visited_stations.len() {
                 sleep(Duration::from_secs(10));
                 continue;
             }
@@ -104,7 +104,7 @@ fn w_main() -> Result<(), Fail> {
         match cfg.mode {
             Mode::Oneshot => return Ok(()),
             Mode::Update => {
-                last_location = Some(location);
+                last_location = Some((location, visited_stations.len()));
                 sleep(Duration::from_secs(10));
             }
         }
