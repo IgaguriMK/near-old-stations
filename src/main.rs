@@ -1,8 +1,3 @@
-mod config;
-mod coords;
-mod download;
-mod journal;
-mod stations;
 
 use std::thread::sleep;
 use std::time::Duration;
@@ -11,8 +6,10 @@ use chrono::Utc;
 use regex::RegexSet;
 use tiny_fail::{ErrorMessageExt, Fail};
 
-use config::{Config, Mode};
-use stations::{load_stations, Outdated, Station};
+use near_old_stations::config::{Config, Mode};
+use near_old_stations::download::download;
+use near_old_stations::journal::load_current_location;
+use near_old_stations::stations::{load_stations, Outdated, Station};
 
 fn main() {
     if let Err(e) = w_main() {
@@ -28,14 +25,14 @@ fn w_main() -> Result<(), Fail> {
     let exclude_systems =
         RegexSet::new(&cfg.exclude_systems).err_msg("failed parse 'exclude_systems'")?;
 
-    download::download().err_msg("failed download dump file")?;
+    download().err_msg("failed download dump file")?;
     let sts = load_stations().err_msg("failed load dump file")?;
 
     let mut last_location = None;
 
     loop {
         let (location, visited_stations) =
-            journal::load_current_location().err_msg("failed load journals")?;
+            load_current_location().err_msg("failed load journals")?;
 
         if let Some((ref last_loc, docked_cnt)) = last_location {
             if last_loc == &location && docked_cnt == visited_stations.len() {

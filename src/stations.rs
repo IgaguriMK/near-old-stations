@@ -112,10 +112,10 @@ fn map_parse_and_check(
 
 #[derive(Debug, Default, Clone, Copy)]
 pub struct Outdated {
-    information: Option<i64>,
-    market: Option<i64>,
-    shipyard: Option<i64>,
-    outfitting: Option<i64>,
+    pub information: Option<i64>,
+    pub market: Option<i64>,
+    pub shipyard: Option<i64>,
+    pub outfitting: Option<i64>,
 }
 
 impl Outdated {
