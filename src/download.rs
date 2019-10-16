@@ -1,33 +1,30 @@
 use std::collections::BTreeMap;
-use std::fmt;
 use std::fs::File;
-use std::io::{self, BufWriter, Write};
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-use progress::{Bar, SpinningCircle};
+use flate2::write::GzEncoder;
+use flate2::Compression;
 use reqwest::header::{HeaderMap, ETAG, IF_NONE_MATCH, USER_AGENT};
 use reqwest::Client;
 use serde_json::{from_reader, to_writer_pretty};
 use tiny_fail::{ErrorMessageExt, Fail};
 
 const TIMEOUT_SECS: u64 = 10;
-const PROGRESS_SIZE: usize = 1024 * 1024;
+const DUMP_URL: &str = "https://www.edsm.net/dump/systemsPopulated.json";
+const DUMP_FILE: &str = "systemsPopulated.json.gz";
 
 pub fn download() -> Result<(), Fail> {
     let etags = EtagStoreage::new("./.cache.json");
     let downloader = Downloader::new(etags)?;
 
-    let target = Target {
-        url: "https://www.edsm.net/dump/systemsPopulated.json".to_owned(),
-    };
-    downloader.download(&target)?;
+    downloader.download()?;
 
     Ok(())
 }
 
 struct Downloader {
-    head_client: Client,
     get_client: Client,
     etags: EtagStoreage,
 }
@@ -51,184 +48,39 @@ impl Downloader {
             .gzip(true)
             .build()?;
 
-        let head_client = Client::builder()
-            .default_headers(default_headers)
-            .connect_timeout(Some(Duration::from_secs(TIMEOUT_SECS)))
-            .gzip(false)
-            .build()?;
-
-        Ok(Downloader {
-            get_client,
-            head_client,
-            etags,
-        })
+        Ok(Downloader { get_client, etags })
     }
 
-    pub fn download(&self, target: &Target) -> Result<(), Fail> {
-        // read size and update check
-        let mut req = self.head_client.head(target.url());
+    pub fn download(&self) -> Result<(), Fail> {
+        let mut req = self.get_client.get(DUMP_URL);
 
-        if let Some(etag) = self.etags.get(target)? {
+        if let Some(etag) = self.etags.get(DUMP_URL)? {
             req = req.header(IF_NONE_MATCH, etag);
         }
 
-        let res = req.send()?;
+        let mut res = req.send()?.error_for_status()?;
 
         if res.status().as_u16() == 304 {
             return Ok(());
         }
 
-        let res = res.error_for_status()?;
-        let size = res.content_length();
-
-        // download
-        let req = self.get_client.get(target.url());
-        let mut res = req.send()?.error_for_status()?;
-
-        let f = File::create(target.name()?)?;
-        let mut w = ProgressWriter::new(f, size, target.name()?);
+        eprintln!("Downloading update...");
+        let f = File::create(DUMP_FILE)?;
+        let mut w = GzEncoder::new(f, Compression::best());
 
         res.copy_to(&mut w)?;
 
         w.flush()?;
-        w.done();
 
         // save ETag
         if let Some(etag) = res.headers().get(ETAG) {
             let etag = etag.to_str().err_msg("can't parse ETag as string")?;
-            self.etags.save(target, etag)?;
+            self.etags.save(DUMP_URL, etag)?;
         } else {
-            self.etags.remove(target)?;
+            self.etags.remove(DUMP_URL)?;
         }
 
         Ok(())
-    }
-}
-
-#[derive(Debug)]
-struct ProgressWriter<W: Write> {
-    inner: BufWriter<W>,
-    progress: Progress,
-}
-
-impl<W: Write> ProgressWriter<W> {
-    fn new(inner: W, size: Option<u64>, name: &str) -> ProgressWriter<W> {
-        ProgressWriter {
-            inner: BufWriter::new(inner),
-            progress: Progress::new(size, name),
-        }
-    }
-
-    fn done(self) {
-        self.progress.done();
-    }
-}
-
-impl<W: Write> Write for ProgressWriter<W> {
-    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        let n = self.inner.write(buf)?;
-        self.progress.add(n);
-        Ok(n)
-    }
-
-    fn flush(&mut self) -> io::Result<()> {
-        self.inner.flush()
-    }
-}
-
-enum Progress {
-    Bar {
-        bar: Bar,
-        current: usize,
-        total: usize,
-        percent: i32,
-    },
-    Spin {
-        spin: SpinningCircle,
-        current: usize,
-    },
-}
-
-impl Progress {
-    fn new(size: Option<u64>, name: &str) -> Progress {
-        match size {
-            Some(size) => {
-                let mut bar = Bar::new();
-                bar.set_job_title(name);
-                Progress::Bar {
-                    bar,
-                    current: 0,
-                    total: size as usize,
-                    percent: 0,
-                }
-            }
-            None => {
-                let mut spin = SpinningCircle::new();
-                spin.set_job_title(name);
-                Progress::Spin { spin, current: 0 }
-            }
-        }
-    }
-
-    fn add(&mut self, amt: usize) {
-        match self {
-            Progress::Bar {
-                bar,
-                current,
-                total,
-                percent,
-            } => {
-                *current += amt;
-                let r = (*current as f64) / (*total as f64);
-                let p = (100.0 * r) as i32;
-                if p != *percent {
-                    bar.reach_percent(p);
-                    *percent = p;
-                }
-            }
-            Progress::Spin { spin, current } => {
-                *current += amt;
-                let n = *current / PROGRESS_SIZE;
-                *current %= PROGRESS_SIZE;
-                for _ in 0..n {
-                    spin.tick();
-                }
-            }
-        }
-    }
-
-    fn done(self) {
-        match self {
-            Progress::Bar { mut bar, .. } => bar.jobs_done(),
-            Progress::Spin { spin, .. } => spin.jobs_done(),
-        }
-    }
-}
-
-impl fmt::Debug for Progress {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            Progress::Bar { .. } => write!(f, "Progress::Bar"),
-            Progress::Spin { .. } => write!(f, "Progress::Spin"),
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct Target {
-    url: String,
-}
-
-impl Target {
-    pub fn url(&self) -> &str {
-        self.url.as_str()
-    }
-
-    pub fn name(&self) -> Result<&str, Fail> {
-        self.url()
-            .split('/')
-            .last()
-            .err_msg("target URL should have name part, but not")
     }
 }
 
@@ -244,19 +96,19 @@ impl EtagStoreage {
         }
     }
 
-    pub fn get(&self, target: &Target) -> Result<Option<String>, Fail> {
+    pub fn get(&self, url: &str) -> Result<Option<String>, Fail> {
         if self.path.exists() {
             let f = File::open(&self.path).err_msg(format!("can't open file: {:?}", self.path))?;
             let mut table: BTreeMap<String, String> =
                 from_reader(f).err_msg("can't parse ETag file")?;
 
-            Ok(table.remove(target.url()))
+            Ok(table.remove(url))
         } else {
             Ok(None)
         }
     }
 
-    pub fn save(&self, target: &Target, etag: &str) -> Result<(), Fail> {
+    pub fn save(&self, url: &str, etag: &str) -> Result<(), Fail> {
         let mut table: BTreeMap<String, String> = if self.path.exists() {
             let f = File::open(&self.path).err_msg(format!("can't open file: {:?}", self.path))?;
             from_reader(f).err_msg("can't parse ETag file")?
@@ -264,7 +116,7 @@ impl EtagStoreage {
             BTreeMap::new()
         };
 
-        table.insert(target.url().to_owned(), etag.to_owned());
+        table.insert(url.to_owned(), etag.to_owned());
 
         let mut f =
             File::create(&self.path).err_msg(format!("can't create file: {:?}", self.path))?;
@@ -273,7 +125,7 @@ impl EtagStoreage {
         Ok(())
     }
 
-    pub fn remove(&self, target: &Target) -> Result<(), Fail> {
+    pub fn remove(&self, url: &str) -> Result<(), Fail> {
         let mut table: BTreeMap<String, String> = if self.path.exists() {
             let f = File::open(&self.path).err_msg(format!("can't open file: {:?}", self.path))?;
             from_reader(f).err_msg("can't parse ETag file")?
@@ -281,7 +133,7 @@ impl EtagStoreage {
             BTreeMap::new()
         };
 
-        table.remove(target.url());
+        table.remove(url);
 
         let mut f =
             File::create(&self.path).err_msg(format!("can't create file: {:?}", self.path))?;

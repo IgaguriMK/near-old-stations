@@ -3,5 +3,6 @@
 
 config.toml
 *.json
+*.gz
 
 /release

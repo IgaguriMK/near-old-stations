@@ -6,12 +6,13 @@ use chrono::{DateTime, TimeZone, Utc};
 use serde::Deserialize;
 use serde_json::from_str;
 use tiny_fail::Fail;
+use flate2::read::GzDecoder;
 
 use crate::coords::Coords;
 
 pub fn load_stations() -> Result<Vec<Station>, Fail> {
-    let f = File::open("./systemsPopulated.json")?;
-    let mut r = BufReader::new(f);
+    let f = File::open("./systemsPopulated.json.gz")?;
+    let mut r = BufReader::new(GzDecoder::new(f));
 
     let mut list = Vec::new();
     let mut buf = String::new();
