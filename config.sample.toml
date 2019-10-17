@@ -2,7 +2,7 @@
 max_dist = 600.0
 
 # 古さの下限
-days = 365
+days = 700
 
 # 表示する行数
 max_entries = 24
