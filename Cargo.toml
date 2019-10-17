@@ -24,5 +24,5 @@ name = "near-old-stations"
 path = "src/main.rs"
 
 [[bin]]
-name = "dist"
-path = "src/bin/dist.rs"
+name = "stats"
+path = "src/bin/stats.rs"
