@@ -11,7 +11,7 @@ use tiny_fail::Fail;
 
 use crate::coords::Coords;
 
-const VISITED_VIEW_FILES: usize = 10;
+const VISITED_VIEW_FILES: usize = 50;
 
 pub fn load_current_location() -> Result<(Location, HashSet<u64>), Fail> {
     let mut journal_files = journal_files()?;

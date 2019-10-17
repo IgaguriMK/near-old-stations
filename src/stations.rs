@@ -3,10 +3,10 @@ use std::fs::File;
 use std::io::{BufRead, BufReader};
 
 use chrono::{DateTime, TimeZone, Utc};
+use flate2::read::GzDecoder;
 use serde::Deserialize;
 use serde_json::from_str;
 use tiny_fail::Fail;
-use flate2::read::GzDecoder;
 
 use crate::coords::Coords;
 
@@ -57,7 +57,7 @@ pub struct Station {
     pub market_id: Option<u64>,
     pub name: String,
     #[serde(rename = "type")]
-    pub st_type: String,
+    pub st_type: StationType,
     #[serde(default)]
     pub system_name: String,
     pub update_time: UpdateTime,
@@ -175,7 +175,7 @@ impl fmt::Display for Outdated {
 
 #[test]
 fn outdated_days() {
-    let outdated = Outdated{
+    let outdated = Outdated {
         information: Some(1),
         market: Some(2),
         shipyard: Some(3),
@@ -183,4 +183,41 @@ fn outdated_days() {
     };
 
     assert_eq!(outdated.days(), Some(4));
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+pub enum StationType {
+    // Orbital Large
+    #[serde(rename = "Ocellus Starport")]
+    OcellusStarport,
+    #[serde(rename = "Orbis Starport")]
+    OrbisStarport,
+    #[serde(rename = "Coriolis Starport")]
+    CoriolisStarport,
+    #[serde(rename = "Asteroid base")]
+    AsteroidBase,
+    #[serde(rename = "Mega ship")]
+    MegaShip,
+    // Orbital small
+    Outpost,
+    // Planetary
+    #[serde(rename = "Planetary Port")]
+    PlanetaryPort,
+    #[serde(rename = "Planetary Outpost")]
+    PlanetaryOutpost,
+}
+
+impl fmt::Display for StationType {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            StationType::OcellusStarport => write!(f, "Ocellus"),
+            StationType::OrbisStarport => write!(f, "Orbis"),
+            StationType::CoriolisStarport => write!(f, "Coriolis"),
+            StationType::AsteroidBase => write!(f, "Asteroid"),
+            StationType::MegaShip => write!(f, "MegaShip"),
+            StationType::Outpost => write!(f, "Outpost"),
+            StationType::PlanetaryPort => write!(f, "PlanetaryPort"),
+            StationType::PlanetaryOutpost => write!(f, "PlanetaryOutpost"),
+        }
+    }
 }

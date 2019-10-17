@@ -81,19 +81,22 @@ fn w_main() -> Result<(), Fail> {
         if cfg.mode == Mode::Update {
             println!("\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n");
         }
+        println!("Total: {} stations.", entries.len());
         for (i, e) in entries.iter().enumerate() {
             if i == cfg.max_entries {
                 break;
             }
             println!(
-                "{:<2}{:>6.2} Ly + {:>8} Ls  {}d [{}]  {:<25}  {}",
+                "{:>3}{:<2}{:>6.2} Ly + {:>8} Ls  {}d [{}]  {:<25} {:<12} ({})",
+                i+1,
                 if e.visited { "*" } else { " " },
                 e.dist,
                 si_fmt(e.distance_to_arrival),
                 e.outdated.days().unwrap(),
                 e.outdated,
                 e.st.name,
-                e.st.system_name
+                e.st.system_name,
+                e.st.st_type,
             );
         }
 
