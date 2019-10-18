@@ -1,17 +1,20 @@
 use std::collections::BTreeMap;
 use std::fs::File;
-use std::io::Write;
+use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use flate2::write::GzEncoder;
 use flate2::Compression;
+use indicatif::{ProgressBar, ProgressStyle};
 use reqwest::header::{HeaderMap, ETAG, IF_NONE_MATCH, USER_AGENT};
 use reqwest::Client;
 use serde_json::{from_reader, to_writer_pretty};
 use tiny_fail::{ErrorMessageExt, Fail};
 
 const TIMEOUT_SECS: u64 = 10;
+const BAR_TICK_SIZE: u64 = 32 * 1024;
+
 const DUMP_URL: &str = "https://www.edsm.net/dump/systemsPopulated.json";
 const DUMP_FILE: &str = "systemsPopulated.json.gz";
 
@@ -26,6 +29,7 @@ pub fn download() -> Result<(), Fail> {
 
 struct Downloader {
     get_client: Client,
+    head_client: Client,
     etags: EtagStoreage,
 }
 
@@ -48,31 +52,70 @@ impl Downloader {
             .gzip(true)
             .build()?;
 
-        Ok(Downloader { get_client, etags })
+        let head_client = Client::builder()
+            .default_headers(default_headers.clone())
+            .connect_timeout(Some(Duration::from_secs(TIMEOUT_SECS)))
+            .gzip(false)
+            .build()?;
+
+        Ok(Downloader {
+            get_client,
+            head_client,
+            etags,
+        })
     }
 
     pub fn download(&self) -> Result<(), Fail> {
-        let mut req = self.get_client.get(DUMP_URL);
+        // check update and get size
+        let spin_style = ProgressStyle::default_spinner().template("{spinner} {msg}");
+
+        let bar = ProgressBar::new_spinner();
+        bar.set_style(spin_style.clone());
+        bar.enable_steady_tick(100);
+        bar.set_message("Checking update");
+
+        let mut req = self.head_client.get(DUMP_URL);
 
         if let Some(etag) = self.etags.get(DUMP_URL)? {
             req = req.header(IF_NONE_MATCH, etag);
         }
 
-        let mut res = req.send()?.error_for_status()?;
+        let res = req.send()?.error_for_status()?;
 
         if res.status().as_u16() == 304 {
+            bar.finish_and_clear();
             return Ok(());
         }
 
-        eprintln!("Downloading update...");
+        let size = res.content_length();
+        bar.finish_and_clear();
+
+        // download
+        let bar = if let Some(size) = size {
+            let bar = ProgressBar::new(size);
+            bar.set_style(ProgressStyle::default_bar().template("{msg} [{bar:40.white/black}] {bytes}/{total_bytes}, {bytes_per_sec}, {eta_precise}"));
+            bar
+        } else {
+            let bar = ProgressBar::new_spinner();
+            bar.set_style(spin_style);
+            bar
+        };
+        bar.set_draw_delta(BAR_TICK_SIZE);
+        bar.set_message("Coneccting");
+
+        let req = self.get_client.get(DUMP_URL);
+
+        let mut res = req.send()?.error_for_status()?;
+
+        bar.set_message("Downloading");
         let f = File::create(DUMP_FILE)?;
-        let mut w = GzEncoder::new(f, Compression::best());
+        let mut w = ProgressWriter::new(GzEncoder::new(f, Compression::best()), bar);
 
         res.copy_to(&mut w)?;
-
-        w.flush()?;
+        let bar = w.finalize()?;
 
         // save ETag
+        bar.set_message("Saving cache info");
         if let Some(etag) = res.headers().get(ETAG) {
             let etag = etag.to_str().err_msg("can't parse ETag as string")?;
             self.etags.save(DUMP_URL, etag)?;
@@ -80,6 +123,7 @@ impl Downloader {
             self.etags.remove(DUMP_URL)?;
         }
 
+        bar.finish_with_message("Downloaded");
         Ok(())
     }
 }
@@ -140,5 +184,34 @@ impl EtagStoreage {
         to_writer_pretty(&mut f, &table).err_msg("can't encode ETag file")?;
 
         Ok(())
+    }
+}
+
+struct ProgressWriter<W: Write> {
+    inner: W,
+    prog: ProgressBar,
+}
+
+impl<W: Write> ProgressWriter<W> {
+    fn new(inner: W, prog: ProgressBar) -> ProgressWriter<W> {
+        ProgressWriter { inner, prog }
+    }
+
+    fn finalize(mut self) -> Result<ProgressBar, io::Error> {
+        self.inner.flush()?;
+        self.prog.tick();
+        Ok(self.prog)
+    }
+}
+
+impl<W: Write> Write for ProgressWriter<W> {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        let n = self.inner.write(buf)?;
+        self.prog.inc(n as u64);
+        Ok(n)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        self.inner.flush()
     }
 }

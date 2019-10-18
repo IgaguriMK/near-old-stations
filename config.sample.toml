@@ -9,7 +9,7 @@ max_entries = 24
 
 # 動作モード
 #   oneshot : 1回実行して終了
-#   update  : 10秒ごとに更新
+#   update  : 自動更新
 mode = "update"
 
 # 除外対象とする星系名の正規表現

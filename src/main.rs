@@ -10,6 +10,8 @@ use near_old_stations::download::download;
 use near_old_stations::journal::load_current_location;
 use near_old_stations::stations::{load_stations, Outdated, Station};
 
+const UPDATE_INTERVAL: u64 = 5;
+
 fn main() {
     if let Err(e) = w_main() {
         eprintln!("Error: {}", e);
@@ -88,7 +90,7 @@ fn w_main() -> Result<(), Fail> {
             }
             println!(
                 "{:>3}{:<2}{:>6.2} Ly + {:>8} Ls  {}d [{}]  {:<25} {:<12} ({})",
-                i+1,
+                i + 1,
                 if e.visited { "*" } else { " " },
                 e.dist,
                 si_fmt(e.distance_to_arrival),
@@ -104,7 +106,7 @@ fn w_main() -> Result<(), Fail> {
             Mode::Oneshot => return Ok(()),
             Mode::Update => {
                 last_location = Some((location, visited_stations.len()));
-                sleep(Duration::from_secs(10));
+                sleep(Duration::from_secs(UPDATE_INTERVAL));
             }
         }
     }
