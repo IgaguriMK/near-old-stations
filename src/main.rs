@@ -7,7 +7,7 @@ use tiny_fail::{ErrorMessageExt, Fail};
 
 use near_old_stations::config::{Config, Mode, Origin};
 use near_old_stations::download::download;
-use near_old_stations::journal::{sol_origin, load_current_location};
+use near_old_stations::journal::{load_current_location, sol_origin};
 use near_old_stations::stations::{load_stations, Outdated, Station};
 
 const UPDATE_INTERVAL: u64 = 5;
@@ -37,8 +37,7 @@ fn w_main() -> Result<(), Fail> {
     let mut last_location = None;
 
     loop {
-        let (location, visited_stations) =
-            get_loc_func().err_msg("failed load journals")?;
+        let (location, visited_stations) = get_loc_func().err_msg("failed load journals")?;
 
         if let Some((ref last_loc, docked_cnt)) = last_location {
             if last_loc == &location && docked_cnt == visited_stations.len() {
@@ -138,11 +137,31 @@ struct Entry<'a> {
 }
 
 impl<'a> Entry<'a> {
-    fn score(&self) -> u64 {
+    fn score(&self) -> Score {
         if self.dist < 0.01 {
-            std::u64::MAX
+            Score::new(std::u64::MAX, self.st.distance_to_arrival)
         } else {
-            ((self.outdated.days().unwrap() as f64) / self.dist) as u64
+            Score::new(
+                ((self.outdated.days().unwrap() as f64) / self.dist) as u64,
+                self.st.distance_to_arrival,
+            )
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+struct Score {
+    sys: u64,
+    arrival: i64,
+}
+
+impl Score {
+    fn new(sys: u64, arrival: Option<f64>) -> Score {
+        Score {
+            sys,
+            arrival: arrival
+                .map(|a| (a * -100000.0) as i64)
+                .unwrap_or(std::i64::MIN),
         }
     }
 }
