@@ -12,6 +12,11 @@ max_entries = 24
 #   update  : 自動更新
 mode = "update"
 
+# 距離計算の起点
+#   current : 現在位置
+#   Sol     : Sol
+pos_origin = "current"
+
 # 除外対象とする星系名の正規表現
 exclude_systems = []
 

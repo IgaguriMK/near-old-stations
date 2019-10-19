@@ -14,6 +14,8 @@ pub struct Config {
     #[serde(default)]
     pub mode: Mode,
     #[serde(default)]
+    pub pos_origin: Origin,
+    #[serde(default)]
     pub excludes: Vec<String>,
     #[serde(default)]
     pub exclude_systems: Vec<String>,
@@ -58,6 +60,13 @@ impl Config {
                     .possible_values(&["oneshot", "update"])
                     .help("Run mode"),
             )
+            .arg(
+                Arg::with_name("pos_origin")
+                    .long("pos-origin")
+                    .takes_value(true)
+                    .possible_values(&["current", "Sol"])
+                    .help("Disctance calculation origin"),
+            )
             .get_matches();
 
         if let Some(s) = matches.value_of("max_dist") {
@@ -65,19 +74,29 @@ impl Config {
                 .parse::<f64>()
                 .err_msg("can't parse 'max_dist' as float")?;
         }
+
         if let Some(s) = matches.value_of("days") {
             cfg.days = s.parse::<i64>().err_msg("can't parse 'days' as int")?;
         }
+
         if let Some(s) = matches.value_of("max_entries") {
             cfg.max_entries = s
                 .parse::<usize>()
                 .err_msg("can't parse 'max_entries' as int")?;
         }
+
         if let Some(s) = matches.value_of("mode") {
             match s {
                 "oneshot" => cfg.mode = Mode::Oneshot,
                 "update" => cfg.mode = Mode::Update,
-                s => return Err(Fail::new(format!("invalid mode '{}'", s))),
+                s => unreachable!("unreachable branch of match 'mode' with {}", s),
+            }
+        }
+        if let Some(s) = matches.value_of("pos_origin") {
+            match s {
+                "current" => cfg.pos_origin = Origin::Current,
+                "Sol" => cfg.pos_origin = Origin::Sol,
+                s => unreachable!("unreachable branch of match 'pos_origin' with {}", s),
             }
         }
 
@@ -95,5 +114,18 @@ pub enum Mode {
 impl Default for Mode {
     fn default() -> Mode {
         Mode::Oneshot
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Deserialize)]
+pub enum Origin {
+    #[serde(rename = "current")]
+    Current,
+    Sol,
+}
+
+impl Default for Origin {
+    fn default() -> Origin {
+        Origin::Current
     }
 }

@@ -5,9 +5,9 @@ use chrono::Utc;
 use regex::RegexSet;
 use tiny_fail::{ErrorMessageExt, Fail};
 
-use near_old_stations::config::{Config, Mode};
+use near_old_stations::config::{Config, Mode, Origin};
 use near_old_stations::download::download;
-use near_old_stations::journal::load_current_location;
+use near_old_stations::journal::{sol_origin, load_current_location};
 use near_old_stations::stations::{load_stations, Outdated, Station};
 
 const UPDATE_INTERVAL: u64 = 5;
@@ -22,6 +22,11 @@ fn main() {
 fn w_main() -> Result<(), Fail> {
     let cfg = Config::load().err_msg("failed load config")?;
 
+    let get_loc_func = match cfg.pos_origin {
+        Origin::Current => load_current_location,
+        Origin::Sol => sol_origin,
+    };
+
     let exclude_patterns = RegexSet::new(&cfg.excludes).err_msg("failed parse 'exclude'")?;
     let exclude_systems =
         RegexSet::new(&cfg.exclude_systems).err_msg("failed parse 'exclude_systems'")?;
@@ -33,7 +38,7 @@ fn w_main() -> Result<(), Fail> {
 
     loop {
         let (location, visited_stations) =
-            load_current_location().err_msg("failed load journals")?;
+            get_loc_func().err_msg("failed load journals")?;
 
         if let Some((ref last_loc, docked_cnt)) = last_location {
             if last_loc == &location && docked_cnt == visited_stations.len() {

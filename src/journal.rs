@@ -13,6 +13,18 @@ use crate::coords::Coords;
 
 const VISITED_VIEW_FILES: usize = 50;
 
+pub fn sol_origin() -> Result<(Location, HashSet<u64>), Fail> {
+    let (_, visited) = load_current_location()?;
+
+    Ok((
+        Location {
+            star_system: "Sol".to_owned(),
+            star_pos: Coords::zero(),
+        },
+        visited,
+    ))
+}
+
 pub fn load_current_location() -> Result<(Location, HashSet<u64>), Fail> {
     let mut journal_files = journal_files()?;
     let mut buf = String::new();
