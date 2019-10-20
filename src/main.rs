@@ -1,7 +1,7 @@
 use std::thread::sleep;
 use std::time::Duration;
 
-use chrono::Utc;
+use chrono::{Local, Utc};
 use regex::RegexSet;
 use tiny_fail::{ErrorMessageExt, Fail};
 
@@ -31,11 +31,15 @@ fn w_main() -> Result<(), Fail> {
     let exclude_systems =
         RegexSet::new(&cfg.exclude_systems).err_msg("failed parse 'exclude_systems'")?;
 
-    download().err_msg("failed download dump file")?;
+    let last_mod = download().err_msg("failed download dump file")?;
     let sts = load_stations().err_msg("failed load dump file")?;
 
-    let mut last_location = None;
+    let last_stations_update = last_mod
+        .map(|t| t.with_timezone(&Local))
+        .map(|t| t.format("%F %T %Z").to_string())
+        .unwrap_or_else(|| "Unknown".to_owned());
 
+    let mut last_location = None;
     loop {
         let (location, visited_stations) = get_loc_func().err_msg("failed load journals")?;
 
@@ -87,7 +91,11 @@ fn w_main() -> Result<(), Fail> {
         if cfg.mode == Mode::Update {
             println!("\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n");
         }
-        println!("Total: {} stations.", entries.len());
+        println!(
+            "Total: {} stations (Last update: {}).",
+            entries.len(),
+            last_stations_update
+        );
         for (i, e) in entries.iter().enumerate() {
             if i == cfg.max_entries {
                 break;

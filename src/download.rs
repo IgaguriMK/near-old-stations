@@ -4,10 +4,11 @@ use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
+use chrono::{DateTime, FixedOffset};
 use flate2::write::GzEncoder;
 use flate2::Compression;
 use indicatif::{ProgressBar, ProgressStyle};
-use reqwest::header::{HeaderMap, ETAG, IF_NONE_MATCH, USER_AGENT};
+use reqwest::header::{HeaderMap, HeaderValue, ETAG, IF_NONE_MATCH, LAST_MODIFIED, USER_AGENT};
 use reqwest::Client;
 use serde_json::{from_reader, to_writer_pretty};
 use tiny_fail::{ErrorMessageExt, Fail};
@@ -18,13 +19,11 @@ const BAR_TICK_SIZE: u64 = 32 * 1024;
 const DUMP_URL: &str = "https://www.edsm.net/dump/systemsPopulated.json";
 const DUMP_FILE: &str = "systemsPopulated.json.gz";
 
-pub fn download() -> Result<(), Fail> {
+pub fn download() -> Result<Option<DateTime<FixedOffset>>, Fail> {
     let etags = EtagStoreage::new("./.cache.json");
     let downloader = Downloader::new(etags)?;
 
-    downloader.download()?;
-
-    Ok(())
+    downloader.download()
 }
 
 struct Downloader {
@@ -65,7 +64,7 @@ impl Downloader {
         })
     }
 
-    pub fn download(&self) -> Result<(), Fail> {
+    pub fn download(&self) -> Result<Option<DateTime<FixedOffset>>, Fail> {
         // check update and get size
         let spin_style = ProgressStyle::default_spinner().template("{spinner} {msg}");
 
@@ -82,9 +81,17 @@ impl Downloader {
 
         let res = req.send()?.error_for_status()?;
 
+        let last_mod = res
+            .headers()
+            .get(LAST_MODIFIED)
+            .map(HeaderValue::to_str)
+            .transpose()?
+            .map(DateTime::parse_from_rfc2822)
+            .transpose()?;
+
         if res.status().as_u16() == 304 {
             bar.finish_and_clear();
-            return Ok(());
+            return Ok(last_mod);
         }
 
         let size = res.content_length();
@@ -124,7 +131,7 @@ impl Downloader {
         }
 
         bar.finish_with_message("Downloaded");
-        Ok(())
+        Ok(last_mod)
     }
 }
 

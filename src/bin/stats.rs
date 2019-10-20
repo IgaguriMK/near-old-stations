@@ -1,6 +1,6 @@
+use std::collections::BTreeMap;
 use std::fs::File;
 use std::io::{BufWriter, Write};
-use std::collections::BTreeMap;
 
 use chrono::Utc;
 use regex::RegexSet;
@@ -8,7 +8,7 @@ use tiny_fail::{ErrorMessageExt, Fail};
 
 use near_old_stations::config::Config;
 use near_old_stations::download::download;
-use near_old_stations::stations::{load_stations, Station, Outdated};
+use near_old_stations::stations::{load_stations, Outdated, Station};
 
 fn main() {
     if let Err(e) = w_main() {
@@ -24,9 +24,8 @@ fn w_main() -> Result<(), Fail> {
     let exclude_systems =
         RegexSet::new(&cfg.exclude_systems).err_msg("failed parse 'exclude_systems'")?;
 
-
     download().err_msg("failed download dump file")?;
-    
+
     let mut sts = Vec::new();
     for st in load_stations().err_msg("failed load dump file")? {
         if exclude_patterns.is_match(&st.name) {
@@ -47,16 +46,18 @@ fn w_main() -> Result<(), Fail> {
     Ok(())
 }
 
-fn count(sts: &[Station], file_name: &str, get_val: impl Fn(Outdated) -> Option<i64>) -> Result<(), Fail> {
+fn count(
+    sts: &[Station],
+    file_name: &str,
+    get_val: impl Fn(Outdated) -> Option<i64>,
+) -> Result<(), Fail> {
     let mut cnt = BTreeMap::<i64, usize>::new();
 
     let now = Utc::now();
     for st in sts {
         let days = st.outdated(now, -1)?;
         if let Some(v) = get_val(days) {
-            cnt.entry(v)
-                .and_modify(|c| *c += 1)
-                .or_insert(1);
+            cnt.entry(v).and_modify(|c| *c += 1).or_insert(1);
         }
     }
 
