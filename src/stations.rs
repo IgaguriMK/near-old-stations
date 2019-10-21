@@ -7,33 +7,28 @@ use std::io::{BufRead, BufReader};
 use chrono::{DateTime, FixedOffset, TimeZone, Utc};
 use flate2::read::GzDecoder;
 use serde::Deserialize;
+use serde::de::DeserializeOwned;
 use serde_json::from_str;
-use tiny_fail::{Fail, ErrorMessageExt};
+use tiny_fail::{ErrorMessageExt, Fail};
 
 use crate::coords::Coords;
-use download::download;
+use download::Downloader;
+
+const SYTEMS_DUMP_URL: &str = "https://www.edsm.net/dump/systemsPopulated.json";
+const SYTEMS_DUMP_FILE: &str = "systemsPopulated.json.gz";
+// const STATIONS_DUMP_URL: &str = "https://www.edsm.net/dump/stations.json";
+// const STATIONS_DUMP_FILE: &str = "stations.json.gz";
 
 pub fn load_stations() -> Result<Stations, Fail> {
-    let last_mod = download().err_msg("failed download dump file")?;
+    let downloader = Downloader::new()?;
+    let last_mod = downloader.download(SYTEMS_DUMP_FILE, SYTEMS_DUMP_URL).err_msg("failed download systemsPopulated dump file")?;
 
-    let f = File::open("./systemsPopulated.json.gz")?;
-    let mut r = BufReader::new(GzDecoder::new(f));
+    let f = File::open(SYTEMS_DUMP_FILE)?;
+    let r = BufReader::new(GzDecoder::new(f));
+    let mut decoder = Decoder::new(r);
 
     let mut list = Vec::new();
-    let mut buf = String::new();
-    loop {
-        r.read_line(&mut buf)?;
-        let s = buf.trim().trim_end_matches(',');
-        if s == "[" {
-            buf.truncate(0);
-            continue;
-        }
-        if s == "]" {
-            break;
-        }
-
-        let sys: System = from_str(s).map_err(|e| Fail::new(format!("{}: {}", e, s)))?;
-        buf.truncate(0);
+    while let Some(sys) = decoder.next::<System>()? {
         for st in &sys.stations {
             let mut st = st.clone();
             st.coords = sys.coords;
@@ -42,7 +37,40 @@ pub fn load_stations() -> Result<Stations, Fail> {
         }
     }
 
-    Ok(Stations{list, last_mod})
+    Ok(Stations { list, last_mod })
+}
+
+struct Decoder<R: BufRead> {
+    r: R,
+    buf: String,
+}
+
+impl<R: BufRead> Decoder<R> {
+    pub fn new(r: R) -> Decoder<R> {
+        Decoder {
+            r,
+            buf: String::new(),
+        }
+    }
+
+    pub fn next<D: DeserializeOwned>(&mut self) -> Result<Option<D>, Fail> {
+        loop {
+            self.r.read_line(&mut self.buf)?;
+            let s = self.buf.trim().trim_end_matches(',');
+            if s == "[" {
+                self.buf.truncate(0);
+                continue;
+            }
+            if s == "]" {
+                return Ok(None);
+            }
+
+            let item: D = from_str(s).map_err(|e| Fail::new(format!("{}: {}", e, s)))?;
+            self.buf.truncate(0);
+
+            return Ok(Some(item));
+        }
+    }
 }
 
 #[derive(Debug)]

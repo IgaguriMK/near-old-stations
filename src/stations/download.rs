@@ -16,24 +16,15 @@ use tiny_fail::{ErrorMessageExt, Fail};
 const TIMEOUT_SECS: u64 = 10;
 const BAR_TICK_SIZE: u64 = 32 * 1024;
 
-const DUMP_URL: &str = "https://www.edsm.net/dump/systemsPopulated.json";
-const DUMP_FILE: &str = "systemsPopulated.json.gz";
 
-pub fn download() -> Result<Option<DateTime<FixedOffset>>, Fail> {
-    let etags = EtagStoreage::new("./.cache.json");
-    let downloader = Downloader::new(etags)?;
-
-    downloader.download()
-}
-
-struct Downloader {
+pub struct Downloader {
     get_client: Client,
     head_client: Client,
     etags: EtagStoreage,
 }
 
 impl Downloader {
-    pub fn new(etags: EtagStoreage) -> Result<Downloader, Fail> {
+    pub fn new() -> Result<Downloader, Fail> {
         let mut default_headers = HeaderMap::new();
         default_headers.insert(
             USER_AGENT,
@@ -60,11 +51,11 @@ impl Downloader {
         Ok(Downloader {
             get_client,
             head_client,
-            etags,
+            etags:EtagStoreage::new("./.cache.json"),
         })
     }
 
-    pub fn download(&self) -> Result<Option<DateTime<FixedOffset>>, Fail> {
+    pub fn download(&self, file_name: &str, url: &str) -> Result<Option<DateTime<FixedOffset>>, Fail> {
         // check update and get size
         let spin_style = ProgressStyle::default_spinner().template("{spinner} {msg}");
 
@@ -73,9 +64,9 @@ impl Downloader {
         bar.enable_steady_tick(100);
         bar.set_message("Checking update");
 
-        let mut req = self.head_client.get(DUMP_URL);
+        let mut req = self.head_client.get(url);
 
-        if let Some(etag) = self.etags.get(DUMP_URL)? {
+        if let Some(etag) = self.etags.get(url)? {
             req = req.header(IF_NONE_MATCH, etag);
         }
 
@@ -110,12 +101,12 @@ impl Downloader {
         bar.set_draw_delta(BAR_TICK_SIZE);
         bar.set_message("Coneccting");
 
-        let req = self.get_client.get(DUMP_URL);
+        let req = self.get_client.get(url);
 
         let mut res = req.send()?.error_for_status()?;
 
         bar.set_message("Downloading");
-        let f = File::create(DUMP_FILE)?;
+        let f = File::create(file_name)?;
         let mut w = ProgressWriter::new(GzEncoder::new(f, Compression::best()), bar);
 
         res.copy_to(&mut w)?;
@@ -125,9 +116,9 @@ impl Downloader {
         bar.set_message("Saving cache info");
         if let Some(etag) = res.headers().get(ETAG) {
             let etag = etag.to_str().err_msg("can't parse ETag as string")?;
-            self.etags.save(DUMP_URL, etag)?;
+            self.etags.save(url, etag)?;
         } else {
-            self.etags.remove(DUMP_URL)?;
+            self.etags.remove(url)?;
         }
 
         bar.finish_with_message("Downloaded");
