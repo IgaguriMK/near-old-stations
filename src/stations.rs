@@ -1,16 +1,21 @@
+pub mod download;
+
 use std::fmt;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 
-use chrono::{DateTime, TimeZone, Utc};
+use chrono::{DateTime, FixedOffset, TimeZone, Utc};
 use flate2::read::GzDecoder;
 use serde::Deserialize;
 use serde_json::from_str;
-use tiny_fail::Fail;
+use tiny_fail::{Fail, ErrorMessageExt};
 
 use crate::coords::Coords;
+use download::download;
 
-pub fn load_stations() -> Result<Vec<Station>, Fail> {
+pub fn load_stations() -> Result<Stations, Fail> {
+    let last_mod = download().err_msg("failed download dump file")?;
+
     let f = File::open("./systemsPopulated.json.gz")?;
     let mut r = BufReader::new(GzDecoder::new(f));
 
@@ -37,7 +42,27 @@ pub fn load_stations() -> Result<Vec<Station>, Fail> {
         }
     }
 
-    Ok(list)
+    Ok(Stations{list, last_mod})
+}
+
+#[derive(Debug)]
+pub struct Stations {
+    list: Vec<Station>,
+    last_mod: Option<DateTime<FixedOffset>>,
+}
+
+impl Stations {
+    pub fn stations(&self) -> &[Station] {
+        &self.list
+    }
+
+    pub fn into_list(self) -> Vec<Station> {
+        self.list
+    }
+
+    pub fn last_mod(&self) -> Option<DateTime<FixedOffset>> {
+        self.last_mod
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize)]

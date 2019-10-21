@@ -7,7 +7,6 @@ use regex::RegexSet;
 use tiny_fail::{ErrorMessageExt, Fail};
 
 use near_old_stations::config::Config;
-use near_old_stations::download::download;
 use near_old_stations::stations::{load_stations, Outdated, Station};
 
 fn main() {
@@ -24,10 +23,8 @@ fn w_main() -> Result<(), Fail> {
     let exclude_systems =
         RegexSet::new(&cfg.exclude_systems).err_msg("failed parse 'exclude_systems'")?;
 
-    download().err_msg("failed download dump file")?;
-
     let mut sts = Vec::new();
-    for st in load_stations().err_msg("failed load dump file")? {
+    for st in load_stations().err_msg("failed load dump file")?.into_list() {
         if exclude_patterns.is_match(&st.name) {
             continue;
         }

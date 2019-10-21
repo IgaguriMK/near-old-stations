@@ -6,7 +6,6 @@ use regex::RegexSet;
 use tiny_fail::{ErrorMessageExt, Fail};
 
 use near_old_stations::config::{Config, Mode, Origin};
-use near_old_stations::download::download;
 use near_old_stations::journal::{load_current_location, sol_origin};
 use near_old_stations::stations::{load_stations, Outdated, Station};
 
@@ -31,10 +30,10 @@ fn w_main() -> Result<(), Fail> {
     let exclude_systems =
         RegexSet::new(&cfg.exclude_systems).err_msg("failed parse 'exclude_systems'")?;
 
-    let last_mod = download().err_msg("failed download dump file")?;
     let sts = load_stations().err_msg("failed load dump file")?;
 
-    let last_stations_update = last_mod
+    let last_stations_update = sts
+        .last_mod()
         .map(|t| t.with_timezone(&Local))
         .map(|t| t.format("%F %T %Z").to_string())
         .unwrap_or_else(|| "Unknown".to_owned());
@@ -52,7 +51,7 @@ fn w_main() -> Result<(), Fail> {
 
         let now = Utc::now();
         let mut entries = Vec::<Entry>::new();
-        for st in &sts {
+        for st in sts.stations() {
             let dist = st.coords.dist_to(location.star_pos);
             if dist > cfg.max_dist {
                 continue;
