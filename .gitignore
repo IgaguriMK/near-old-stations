@@ -6,4 +6,4 @@ config.toml
 *.gz
 *.txt
 
-/release
+/near-old-stations

@@ -1,10 +1,10 @@
 #!/bin/bash
 
-rm -r release || true
+rm -r near-old-stations || true
 
 set -eu
 
 cargo b --release
-mkdir release
-cp target/release/near-old-stations.exe release/
-cp config.sample.toml release/config.toml
+mkdir near-old-stations
+cp target/release/near-old-stations.exe near-old-stations/
+cp config.sample.toml near-old-stations/config.toml

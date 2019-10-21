@@ -42,8 +42,6 @@ pub fn load_stations() -> Result<Stations, Fail> {
         }
     }
 
-    eprintln!("{:#?}", missing_coords_stations);
-
     Ok(Stations {
         list,
         last_mod,
