@@ -105,7 +105,7 @@ impl Downloader {
 
         let mut res = req.send()?.error_for_status()?;
 
-        bar.set_message("Downloading");
+        bar.set_message(file_name.trim_end_matches(".json.gz"));
         let f = File::create(file_name)?;
         let mut w = ProgressWriter::new(GzEncoder::new(f, Compression::best()), bar);
 
