@@ -6,11 +6,21 @@ use serde::Deserialize;
 use tiny_fail::{ErrorMessageExt, Fail};
 use toml::from_slice;
 
+use crate::stations::Criteria;
+
 #[derive(Debug, Clone, Deserialize)]
 pub struct Config {
     pub max_dist: f64,
     pub days: i64,
     pub max_entries: usize,
+    #[serde(default = "default_true")]
+    pub information: bool,
+    #[serde(default = "default_true")]
+    pub market: bool,
+    #[serde(default = "default_true")]
+    pub shipyard: bool,
+    #[serde(default = "default_true")]
+    pub outfitting: bool,
     #[serde(default)]
     pub mode: Mode,
     #[serde(default)]
@@ -104,6 +114,24 @@ impl Config {
     }
 }
 
+impl Criteria for Config {
+    fn days(&self) -> i64 {
+        self.days
+    }
+    fn information(&self) -> bool {
+        self.information
+    }
+    fn market(&self) -> bool {
+        self.market
+    }
+    fn shipyard(&self) -> bool {
+        self.shipyard
+    }
+    fn outfitting(&self) -> bool {
+        self.outfitting
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Mode {
@@ -128,4 +156,8 @@ impl Default for Origin {
     fn default() -> Origin {
         Origin::Current
     }
+}
+
+fn default_true() -> bool {
+    true
 }

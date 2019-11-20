@@ -57,7 +57,7 @@ fn w_main() -> Result<(), Fail> {
                 continue;
             }
 
-            let outdated = st.outdated(now, cfg.days)?;
+            let outdated = st.outdated(now, &cfg);
             if !outdated.is_outdated() {
                 continue;
             }

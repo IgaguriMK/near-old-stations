@@ -1,4 +1,4 @@
-# 現在地からの最大距離
+# 現在地からの最大距離 (LY)
 max_dist = 600.0
 
 # 古さの下限
@@ -6,6 +6,16 @@ days = 700
 
 # 表示する行数
 max_entries = 24
+
+# 対象とする項目
+# information : ステーションの基本情報
+# market      : コモディティの市場情報
+# shipyard    : シップヤードの情報
+# outfitting  : パーツの情報
+information = true
+market = true
+shipyard = true
+outfitting = true
 
 # 動作モード
 #   oneshot : 1回実行して終了

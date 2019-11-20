@@ -1,12 +1,15 @@
 pub mod download;
 
+mod date_format;
+mod date_format_opt;
+
 use std::collections::HashMap;
 use std::fmt;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::path::Path;
 
-use chrono::{DateTime, FixedOffset, TimeZone, Utc};
+use chrono::{DateTime, FixedOffset, Utc};
 use flate2::read::GzDecoder;
 use flate2::write::GzEncoder;
 use flate2::Compression;
@@ -192,50 +195,119 @@ pub struct Station {
 }
 
 impl Station {
-    pub fn outdated(&self, now: DateTime<Utc>, days_thres: i64) -> Result<Outdated, Fail> {
-        self.update_time.outdated(now, days_thres)
+    pub fn outdated(&self, now: DateTime<Utc>, criteria: impl Criteria) -> Outdated {
+        self.update_time.outdated(now, criteria)
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UpdateTime {
-    information: String,
-    market: Option<String>,
-    shipyard: Option<String>,
-    outfitting: Option<String>,
+    #[serde(with = "date_format")]
+    information: DateTime<Utc>,
+    #[serde(with = "date_format_opt")]
+    market: Option<DateTime<Utc>>,
+    #[serde(with = "date_format_opt")]
+    shipyard: Option<DateTime<Utc>>,
+    #[serde(with = "date_format_opt")]
+    outfitting: Option<DateTime<Utc>>,
 }
 
 impl UpdateTime {
-    fn outdated(&self, now: DateTime<Utc>, days_thres: i64) -> Result<Outdated, Fail> {
-        Ok(Outdated {
-            information: parse_and_check(now, days_thres, &self.information)?,
-            market: map_parse_and_check(now, days_thres, self.market.as_ref())?,
-            shipyard: map_parse_and_check(now, days_thres, self.shipyard.as_ref())?,
-            outfitting: map_parse_and_check(now, days_thres, self.outfitting.as_ref())?,
-        })
+    fn outdated(&self, now: DateTime<Utc>, criteria: impl Criteria) -> Outdated {
+        let information = if criteria.information() {
+            check(self.information, now, criteria.days())
+        } else {
+            None
+        };
+
+        let market = if criteria.market() {
+            flatten(self.market.map(|t| check(t, now, criteria.days())))
+        } else {
+            None
+        };
+
+        let shipyard = if criteria.shipyard() {
+            flatten(self.shipyard.map(|t| check(t, now, criteria.days())))
+        } else {
+            None
+        };
+
+        let outfitting = if criteria.outfitting() {
+            flatten(self.outfitting.map(|t| check(t, now, criteria.days())))
+        } else {
+            None
+        };
+
+        Outdated {
+            information,
+            market,
+            shipyard,
+            outfitting,
+        }
     }
 }
 
-fn parse_and_check(now: DateTime<Utc>, days_thres: i64, s: &str) -> Result<Option<i64>, Fail> {
-    let t = Utc.datetime_from_str(s, "%Y-%m-%d %H:%M:%S")?;
+fn check(t: DateTime<Utc>, now: DateTime<Utc>, days_thres: i64) -> Option<i64> {
     let days = now.signed_duration_since(t).num_days();
     if days > days_thres {
-        Ok(Some(days))
+        Some(days)
     } else {
-        Ok(None)
+        None
     }
 }
 
-fn map_parse_and_check(
-    now: DateTime<Utc>,
-    days_thres: i64,
-    s: Option<&String>,
-) -> Result<Option<i64>, Fail> {
-    if let Some(s) = s {
-        parse_and_check(now, days_thres, s)
-    } else {
-        Ok(None)
+fn flatten<T>(opt: Option<Option<T>>) -> Option<T> {
+    match opt {
+        Some(Some(x)) => Some(x),
+        _ => None,
+    }
+}
+
+pub trait Criteria {
+    fn days(&self) -> i64;
+    fn information(&self) -> bool;
+    fn market(&self) -> bool;
+    fn shipyard(&self) -> bool;
+    fn outfitting(&self) -> bool;
+}
+
+impl <C: Criteria> Criteria for &C {
+    fn days(&self) -> i64 {
+        (*self).days()
+    }
+    fn information(&self) -> bool {
+        (*self).information()
+    }
+    fn market(&self) -> bool {
+        (*self).market()
+    }
+    fn shipyard(&self) -> bool {
+        (*self).shipyard()
+    }
+    fn outfitting(&self) -> bool {
+        (*self).outfitting()
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct All;
+
+impl Criteria for All {
+    fn days(&self) -> i64 {
+        -1
+    }
+    fn information(&self) -> bool {
+        true
+    }
+    fn market(&self) -> bool {
+        true
+    }
+    fn shipyard(&self) -> bool {
+        true
+    }
+    fn outfitting(&self) -> bool {
+        true
     }
 }
 
