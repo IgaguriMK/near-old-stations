@@ -34,7 +34,7 @@ pub fn load_stations() -> Result<Stations, Fail> {
     let coords_table = load_coords(&downloader, false)?;
 
     let last_mod = stations.last_mod();
-    let mut list = Vec::with_capacity(stations.stations().len());
+    let mut list = Vec::new();
     let mut missing_coords_stations = Vec::new();
     for mut st in stations.into_list() {
         if let Some(&c) = coords_table.get(&st.system_id) {
@@ -159,8 +159,8 @@ pub struct Stations {
 }
 
 impl Stations {
-    pub fn stations(&self) -> &[Station] {
-        &self.list
+    pub fn stations(&self) -> impl Iterator<Item = &Station> {
+        self.list.iter()
     }
 
     pub fn into_list(self) -> Vec<Station> {
@@ -195,8 +195,8 @@ pub struct Station {
 }
 
 impl Station {
-    pub fn outdated(&self, now: DateTime<Utc>, criteria: impl Criteria) -> Outdated {
-        self.update_time.outdated(now, criteria)
+    pub fn update_time(&self) -> &UpdateTime {
+        &self.update_time
     }
 }
 
@@ -214,176 +214,21 @@ pub struct UpdateTime {
 }
 
 impl UpdateTime {
-    fn outdated(&self, now: DateTime<Utc>, criteria: impl Criteria) -> Outdated {
-        let information = if criteria.information() {
-            check(self.information, now, criteria.days())
-        } else {
-            None
-        };
-
-        let market = if criteria.market() {
-            flatten(self.market.map(|t| check(t, now, criteria.days())))
-        } else {
-            None
-        };
-
-        let shipyard = if criteria.shipyard() {
-            flatten(self.shipyard.map(|t| check(t, now, criteria.days())))
-        } else {
-            None
-        };
-
-        let outfitting = if criteria.outfitting() {
-            flatten(self.outfitting.map(|t| check(t, now, criteria.days())))
-        } else {
-            None
-        };
-
-        Outdated {
-            information,
-            market,
-            shipyard,
-            outfitting,
-        }
-    }
-}
-
-fn check(t: DateTime<Utc>, now: DateTime<Utc>, days_thres: i64) -> Option<i64> {
-    let days = now.signed_duration_since(t).num_days();
-    if days > days_thres {
-        Some(days)
-    } else {
-        None
-    }
-}
-
-#[allow(clippy::option_option)]
-fn flatten<T>(opt: Option<Option<T>>) -> Option<T> {
-    match opt {
-        Some(Some(x)) => Some(x),
-        _ => None,
-    }
-}
-
-pub trait Criteria {
-    fn days(&self) -> i64;
-    fn information(&self) -> bool;
-    fn market(&self) -> bool;
-    fn shipyard(&self) -> bool;
-    fn outfitting(&self) -> bool;
-}
-
-impl<C: Criteria> Criteria for &C {
-    fn days(&self) -> i64 {
-        (*self).days()
-    }
-    fn information(&self) -> bool {
-        (*self).information()
-    }
-    fn market(&self) -> bool {
-        (*self).market()
-    }
-    fn shipyard(&self) -> bool {
-        (*self).shipyard()
-    }
-    fn outfitting(&self) -> bool {
-        (*self).outfitting()
-    }
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct All;
-
-impl Criteria for All {
-    fn days(&self) -> i64 {
-        -1
-    }
-    fn information(&self) -> bool {
-        true
-    }
-    fn market(&self) -> bool {
-        true
-    }
-    fn shipyard(&self) -> bool {
-        true
-    }
-    fn outfitting(&self) -> bool {
-        true
-    }
-}
-
-#[derive(Debug, Default, Clone, Copy)]
-pub struct Outdated {
-    pub information: Option<i64>,
-    pub market: Option<i64>,
-    pub shipyard: Option<i64>,
-    pub outfitting: Option<i64>,
-}
-
-impl Outdated {
-    pub fn is_outdated(self) -> bool {
-        self.information.is_some()
-            || self.market.is_some()
-            || self.shipyard.is_some()
-            || self.outfitting.is_some()
+    pub fn information(&self) -> DateTime<Utc> {
+        self.information
     }
 
-    pub fn days(self) -> Option<i64> {
-        let mut res = self.information;
-
-        if self.market > res {
-            res = self.market;
-        }
-        if self.shipyard > res {
-            res = self.shipyard;
-        }
-        if self.outfitting > res {
-            res = self.outfitting;
-        }
-
-        res
+    pub fn market(&self) -> Option<DateTime<Utc>> {
+        self.market
     }
-}
 
-impl fmt::Display for Outdated {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        if self.information.is_some() {
-            write!(f, "I")?;
-        } else {
-            write!(f, " ")?;
-        }
-
-        if self.market.is_some() {
-            write!(f, "M")?;
-        } else {
-            write!(f, " ")?;
-        }
-
-        if self.shipyard.is_some() {
-            write!(f, "S")?;
-        } else {
-            write!(f, " ")?;
-        }
-        if self.outfitting.is_some() {
-            write!(f, "O")?;
-        } else {
-            write!(f, " ")?;
-        }
-
-        Ok(())
+    pub fn shipyard(&self) -> Option<DateTime<Utc>> {
+        self.shipyard
     }
-}
 
-#[test]
-fn outdated_days() {
-    let outdated = Outdated {
-        information: Some(1),
-        market: Some(2),
-        shipyard: Some(3),
-        outfitting: Some(4),
-    };
-
-    assert_eq!(outdated.days(), Some(4));
+    pub fn outfitting(&self) -> Option<DateTime<Utc>> {
+        self.outfitting
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]

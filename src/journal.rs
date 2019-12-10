@@ -13,17 +13,19 @@ use crate::coords::Coords;
 
 const VISITED_VIEW_FILES: usize = 50;
 
-pub fn sol_origin() -> Result<(Location, HashSet<u64>), Fail> {
+pub type GetLocFunc = fn() -> Result<(Location, Visited), Fail>;
+
+pub fn sol_origin() -> Result<(Location, Visited), Fail> {
     let (_, visited) = load_current_location()?;
 
     Ok((sol(), visited))
 }
 
-pub fn load_current_location() -> Result<(Location, HashSet<u64>), Fail> {
+pub fn load_current_location() -> Result<(Location, Visited), Fail> {
     if let Some(journal_files) = journal_files()? {
         load_location_from_file(journal_files)
     } else {
-        Ok((sol(), HashSet::new()))
+        Ok((sol(), Visited::new()))
     }
 }
 
@@ -34,13 +36,11 @@ fn sol() -> Location {
     }
 }
 
-fn load_location_from_file(
-    mut journal_files: Vec<PathBuf>,
-) -> Result<(Location, HashSet<u64>), Fail> {
+fn load_location_from_file(mut journal_files: Vec<PathBuf>) -> Result<(Location, Visited), Fail> {
     let mut buf = String::new();
 
     let mut location = Option::<Location>::None;
-    let mut visited_stations = HashSet::<u64>::new();
+    let mut visited = Visited::new();
 
     while let Some(file_path) = journal_files.pop() {
         let f = File::open(&file_path)?;
@@ -58,7 +58,7 @@ fn load_location_from_file(
                 Event::Location(loc) => location = Some(loc),
                 Event::FSDJump(loc) => location = Some(loc),
                 Event::Docked(docked) => {
-                    visited_stations.insert(docked.market_id);
+                    visited.add(docked.market_id);
                 }
                 _ => {}
             }
@@ -88,15 +88,15 @@ fn load_location_from_file(
             let event: Event = from_str(&buf).map_err(|e| Fail::new(format!("{}: {}", e, buf)))?;
             buf.truncate(0);
             if let Event::Docked(docked) = event {
-                visited_stations.insert(docked.market_id);
+                visited.add(docked.market_id);
             }
         }
     }
 
     if let Some(loc) = location {
-        Ok((loc, visited_stations))
+        Ok((loc, visited))
     } else {
-        Ok((sol(), HashSet::new()))
+        Ok((sol(), Visited::new()))
     }
 }
 
@@ -156,6 +156,27 @@ enum Event {
 pub struct Location {
     pub star_system: String,
     pub star_pos: Coords,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Visited {
+    visited: HashSet<u64>,
+}
+
+impl Visited {
+    fn new() -> Visited {
+        Visited {
+            visited: HashSet::new(),
+        }
+    }
+
+    fn add(&mut self, id: u64) {
+        self.visited.insert(id);
+    }
+
+    pub fn is_visited(&self, id: u64) -> bool {
+        self.visited.contains(&id)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize)]
