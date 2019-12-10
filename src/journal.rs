@@ -16,17 +16,27 @@ const VISITED_VIEW_FILES: usize = 50;
 pub fn sol_origin() -> Result<(Location, HashSet<u64>), Fail> {
     let (_, visited) = load_current_location()?;
 
-    Ok((
-        Location {
-            star_system: "Sol".to_owned(),
-            star_pos: Coords::zero(),
-        },
-        visited,
-    ))
+    Ok((sol(), visited))
 }
 
 pub fn load_current_location() -> Result<(Location, HashSet<u64>), Fail> {
-    let mut journal_files = journal_files()?;
+    if let Some(journal_files) = journal_files()? {
+        load_location_from_file(journal_files)
+    } else {
+        Ok((sol(), HashSet::new()))
+    }
+}
+
+fn sol() -> Location {
+    Location {
+        star_system: "Sol".to_owned(),
+        star_pos: Coords::zero(),
+    }
+}
+
+fn load_location_from_file(
+    mut journal_files: Vec<PathBuf>,
+) -> Result<(Location, HashSet<u64>), Fail> {
     let mut buf = String::new();
 
     let mut location = Option::<Location>::None;
@@ -89,12 +99,16 @@ pub fn load_current_location() -> Result<(Location, HashSet<u64>), Fail> {
     if let Some(loc) = location {
         Ok((loc, visited_stations))
     } else {
-        Err(Fail::new("No location entry"))
+        Ok((sol(), HashSet::new()))
     }
 }
 
-fn journal_files() -> Result<Vec<PathBuf>, Fail> {
+fn journal_files() -> Result<Option<Vec<PathBuf>>, Fail> {
     let journal_dir = journal_dir()?;
+    if !journal_dir.exists() {
+        return Ok(None);
+    }
+
     let journal_regex = Regex::new(r"^Journal\.\d{12}\.\d{2}\.log$")?;
 
     let journal_files = journal_dir
@@ -109,7 +123,7 @@ fn journal_files() -> Result<Vec<PathBuf>, Fail> {
         })
         .collect();
 
-    Ok(journal_files)
+    Ok(Some(journal_files))
 }
 
 fn journal_dir() -> Result<PathBuf, Fail> {

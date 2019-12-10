@@ -16,7 +16,6 @@ use tiny_fail::{ErrorMessageExt, Fail};
 const TIMEOUT_SECS: u64 = 10;
 const BAR_TICK_SIZE: u64 = 32 * 1024;
 
-
 pub struct Downloader {
     get_client: Client,
     head_client: Client,
@@ -51,11 +50,15 @@ impl Downloader {
         Ok(Downloader {
             get_client,
             head_client,
-            etags:EtagStoreage::new("./.cache.json"),
+            etags: EtagStoreage::new("./.cache.json"),
         })
     }
 
-    pub fn download(&self, file_name: &str, url: &str) -> Result<Option<DateTime<FixedOffset>>, Fail> {
+    pub fn download(
+        &self,
+        file_name: &str,
+        url: &str,
+    ) -> Result<Option<DateTime<FixedOffset>>, Fail> {
         // check update and get size
         let spin_style = ProgressStyle::default_spinner().template("{spinner} {msg}");
 

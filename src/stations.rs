@@ -272,7 +272,7 @@ pub trait Criteria {
     fn outfitting(&self) -> bool;
 }
 
-impl <C: Criteria> Criteria for &C {
+impl<C: Criteria> Criteria for &C {
     fn days(&self) -> i64 {
         (*self).days()
     }
