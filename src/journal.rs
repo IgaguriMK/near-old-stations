@@ -101,44 +101,44 @@ fn load_location_from_file(
 }
 
 fn journal_files() -> Result<Option<Vec<PathBuf>>, Fail> {
-    let journal_dir = journal_dir()?;
-    if !journal_dir.exists() {
-        return Ok(None);
+    if let Some(journal_dir) = journal_dir() {
+        if !journal_dir.exists() {
+            return Ok(None);
+        }
+        let journal_regex = Regex::new(r"^Journal\.\d{12}\.\d{2}\.log$")?;
+        let journal_files = journal_dir
+            .read_dir()?
+            .filter_map(|f| f.ok())
+            .map(|f| f.path())
+            .filter(|p| {
+                if let Some(n) = p.file_name().and_then(|n| n.to_str()) {
+                    return journal_regex.is_match(n);
+                }
+                false
+            })
+            .collect();
+        Ok(Some(journal_files))
+    } else {
+        Ok(None)
     }
-
-    let journal_regex = Regex::new(r"^Journal\.\d{12}\.\d{2}\.log$")?;
-
-    let journal_files = journal_dir
-        .read_dir()?
-        .filter_map(|f| f.ok())
-        .map(|f| f.path())
-        .filter(|p| {
-            if let Some(n) = p.file_name().and_then(|n| n.to_str()) {
-                return journal_regex.is_match(n);
-            }
-            false
-        })
-        .collect();
-
-    Ok(Some(journal_files))
 }
 
-fn journal_dir() -> Result<PathBuf, Fail> {
-    let home = var("USERPROFILE")?;
-    let journal_dir = Path::new(&home).join(r"Saved Games\Frontier Developments\Elite Dangerous");
-    if !journal_dir.exists() {
-        return Err(Fail::new(format!(
-            "'{}' is not exists.",
-            journal_dir.to_string_lossy()
-        )));
+fn journal_dir() -> Option<PathBuf> {
+    if let Ok(home) = var("USERPROFILE") {
+        let journal_dir = Path::new(&home)
+            .join("Saved Games")
+            .join("Frontier Developments")
+            .join("Elite Dangerous");
+        if !journal_dir.exists() {
+            return None;
+        }
+        if !journal_dir.is_dir() {
+            return None;
+        }
+        Some(journal_dir)
+    } else {
+        None
     }
-    if !journal_dir.is_dir() {
-        return Err(Fail::new(format!(
-            "'{}' is not dir.",
-            journal_dir.to_string_lossy()
-        )));
-    }
-    Ok(journal_dir)
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize)]
