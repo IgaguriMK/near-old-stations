@@ -62,10 +62,10 @@ impl Downloader {
         // check update and get size
         let spin_style = ProgressStyle::default_spinner().template("{spinner} {msg}");
 
-        let bar = ProgressBar::new_spinner();
-        bar.set_style(spin_style.clone());
-        bar.enable_steady_tick(100);
-        bar.set_message("Checking update");
+        let prog_bar = ProgressBar::new_spinner();
+        prog_bar.set_style(spin_style.clone());
+        prog_bar.enable_steady_tick(100);
+        prog_bar.set_message("Checking update");
 
         let mut req = self.head_client.get(url);
 
@@ -84,39 +84,39 @@ impl Downloader {
             .transpose()?;
 
         if res.status().as_u16() == 304 {
-            bar.finish_and_clear();
+            prog_bar.finish_and_clear();
             return Ok(last_mod);
         }
 
         let size = res.content_length();
-        bar.finish_and_clear();
+        prog_bar.finish_and_clear();
 
         // download
-        let bar = if let Some(size) = size {
-            let bar = ProgressBar::new(size);
-            bar.set_style(ProgressStyle::default_bar().template("{msg} [{bar:40.white/black}] {bytes}/{total_bytes}, {bytes_per_sec}, {eta_precise}"));
-            bar
+        let prog_bar = if let Some(size) = size {
+            let prog_bar = ProgressBar::new(size);
+            prog_bar.set_style(ProgressStyle::default_bar().template("{msg} [{bar:40.white/black}] {bytes}/{total_bytes}, {bytes_per_sec}, {eta_precise}"));
+            prog_bar
         } else {
-            let bar = ProgressBar::new_spinner();
-            bar.set_style(spin_style);
-            bar
+            let prog_bar = ProgressBar::new_spinner();
+            prog_bar.set_style(spin_style);
+            prog_bar
         };
-        bar.set_draw_delta(BAR_TICK_SIZE);
-        bar.set_message("Coneccting");
+        prog_bar.set_draw_delta(BAR_TICK_SIZE);
+        prog_bar.set_message("Coneccting");
 
         let req = self.get_client.get(url);
 
         let mut res = req.send()?.error_for_status()?;
 
-        bar.set_message(file_name.trim_end_matches(".json.gz"));
+        prog_bar.set_message(file_name.trim_end_matches(".json.gz"));
         let f = File::create(file_name)?;
-        let mut w = ProgressWriter::new(GzEncoder::new(f, Compression::best()), bar);
+        let mut w = ProgressWriter::new(GzEncoder::new(f, Compression::best()), prog_bar);
 
         res.copy_to(&mut w)?;
-        let bar = w.finalize()?;
+        let prog_bar = w.finalize()?;
 
         // save ETag
-        bar.set_message("Saving cache info");
+        prog_bar.set_message("Saving cache info");
         if let Some(etag) = res.headers().get(ETAG) {
             let etag = etag.to_str().err_msg("can't parse ETag as string")?;
             self.etags.save(url, etag)?;
@@ -124,7 +124,7 @@ impl Downloader {
             self.etags.remove(url)?;
         }
 
-        bar.finish_with_message("Downloaded");
+        prog_bar.finish_with_message("Downloaded");
         Ok(last_mod)
     }
 }

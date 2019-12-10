@@ -11,6 +11,8 @@ use near_old_stations::stations::{load_stations, Outdated, Station};
 
 const UPDATE_INTERVAL: u64 = 5;
 
+const SORT_MULT: f64 = 100_000.0;
+
 fn main() {
     if let Err(e) = w_main() {
         eprintln!("Error: {}", e);
@@ -127,9 +129,9 @@ fn si_fmt(x: Option<f64>) -> String {
     match x {
         None => "unknown".to_owned(),
         Some(x) if x < 100.0 => format!("{:.2} ", x),
-        Some(x) if x < 1000.0 => format!("{:.1} ", x),
-        Some(x) if x < 10000.0 => format!("{:.2}k", x / 1000.0),
-        Some(x) if x < 100000.0 => format!("{:.1}k", x / 1000.0),
+        Some(x) if x < 1_000.0 => format!("{:.1} ", x),
+        Some(x) if x < 10_000.0 => format!("{:.2}k", x / 1000.0),
+        Some(x) if x < 100_000.0 => format!("{:.1}k", x / 1000.0),
         Some(x) => format!("{:.0}k", x / 1000.0),
     }
 }
@@ -167,7 +169,7 @@ impl Score {
         Score {
             sys,
             arrival: arrival
-                .map(|a| (a * -100000.0) as i64)
+                .map(|a| (a * -SORT_MULT) as i64)
                 .unwrap_or(std::i64::MIN),
         }
     }

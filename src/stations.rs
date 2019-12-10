@@ -257,6 +257,7 @@ fn check(t: DateTime<Utc>, now: DateTime<Utc>, days_thres: i64) -> Option<i64> {
     }
 }
 
+#[allow(clippy::option_option)]
 fn flatten<T>(opt: Option<Option<T>>) -> Option<T> {
     match opt {
         Some(Some(x)) => Some(x),

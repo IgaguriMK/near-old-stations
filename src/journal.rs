@@ -87,11 +87,8 @@ fn load_location_from_file(
 
             let event: Event = from_str(&buf).map_err(|e| Fail::new(format!("{}: {}", e, buf)))?;
             buf.truncate(0);
-            match event {
-                Event::Docked(docked) => {
-                    visited_stations.insert(docked.market_id);
-                }
-                _ => {}
+            if let Event::Docked(docked) = event {
+                visited_stations.insert(docked.market_id);
             }
         }
     }
