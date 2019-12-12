@@ -2,33 +2,25 @@ use std::fs::File;
 use std::io::Read;
 
 use clap::{crate_version, App, Arg};
+use regex::RegexSet;
 use serde::Deserialize;
 use tiny_fail::{ErrorMessageExt, Fail};
 use toml::from_slice;
 
-use crate::stations::Criteria;
+use crate::filter::{Days, Filter, Filters};
+use crate::journal::{load_current_location, sol_origin, GetLocFunc};
+use crate::mode;
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct Config {
-    pub max_dist: f64,
-    pub days: i64,
-    pub max_entries: usize,
-    #[serde(default = "default_true")]
-    pub information: bool,
-    #[serde(default = "default_true")]
-    pub market: bool,
-    #[serde(default = "default_true")]
-    pub shipyard: bool,
-    #[serde(default = "default_true")]
-    pub outfitting: bool,
+    days: OutdatedDays,
+    filter: FilterConfig,
+    max_entries: usize,
     #[serde(default)]
-    pub mode: Mode,
+    mode: Mode,
+    max_dist: f64,
     #[serde(default)]
-    pub pos_origin: Origin,
-    #[serde(default)]
-    pub excludes: Vec<String>,
-    #[serde(default)]
-    pub exclude_systems: Vec<String>,
+    pos_origin: Origin,
 }
 
 impl Config {
@@ -49,12 +41,6 @@ impl Config {
                     .long("max-dist")
                     .takes_value(true)
                     .help("Maximum distance from current position"),
-            )
-            .arg(
-                Arg::with_name("days")
-                    .long("days")
-                    .takes_value(true)
-                    .help("Minimum days from last update"),
             )
             .arg(
                 Arg::with_name("max_entries")
@@ -85,10 +71,6 @@ impl Config {
                 .err_msg("can't parse 'max_dist' as float")?;
         }
 
-        if let Some(s) = matches.value_of("days") {
-            cfg.days = s.parse::<i64>().err_msg("can't parse 'days' as int")?;
-        }
-
         if let Some(s) = matches.value_of("max_entries") {
             cfg.max_entries = s
                 .parse::<usize>()
@@ -112,23 +94,88 @@ impl Config {
 
         Ok(cfg)
     }
+
+    pub fn filter(&self) -> Result<Filters, Fail> {
+        let mut filters = Filters::new();
+
+        filters.add(Filter::Dist(self.max_dist));
+        self.days.filter(&mut filters);
+        self.filter.filter(&mut filters)?;
+
+        Ok(filters)
+    }
+
+    pub fn filter_config(&self) -> &FilterConfig {
+        &self.filter
+    }
+
+    pub fn get_loc_func(&self) -> GetLocFunc {
+        match self.pos_origin {
+            Origin::Current => load_current_location,
+            Origin::Sol => sol_origin,
+        }
+    }
+
+    pub fn max_entries(&self) -> usize {
+        self.max_entries
+    }
+
+    pub fn mode(&self) -> mode::Mode {
+        match self.mode {
+            Mode::Oneshot => mode::Mode::Oneshot,
+            Mode::Update => mode::Mode::Update,
+        }
+    }
 }
 
-impl Criteria for Config {
-    fn days(&self) -> i64 {
-        self.days
+#[derive(Debug, Clone, Copy, PartialEq, Deserialize)]
+pub struct OutdatedDays {
+    information: Option<i64>,
+    market: Option<i64>,
+    shipyard: Option<i64>,
+    outfitting: Option<i64>,
+}
+
+impl OutdatedDays {
+    fn filter(&self, filters: &mut Filters) {
+        if let Some(days) = self.information {
+            filters.add(Filter::Days(Days::Information(days)));
+        }
+        if let Some(days) = self.market {
+            filters.add(Filter::Days(Days::Market(days)));
+        }
+        if let Some(days) = self.shipyard {
+            filters.add(Filter::Days(Days::Shipyard(days)));
+        }
+        if let Some(days) = self.outfitting {
+            filters.add(Filter::Days(Days::Outfitting(days)));
+        }
+        filters.add(Filter::Outdated);
     }
-    fn information(&self) -> bool {
-        self.information
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+pub struct FilterConfig {
+    #[serde(default)]
+    pub exclude_names: Vec<String>,
+    #[serde(default)]
+    pub exclude_systems: Vec<String>,
+}
+
+impl FilterConfig {
+    fn filter(&self, filters: &mut Filters) -> Result<(), Fail> {
+        filters.add(Filter::StationName(self.exclude_names()?));
+        filters.add(Filter::SystemName(self.exclude_systems()?));
+
+        Ok(())
     }
-    fn market(&self) -> bool {
-        self.market
+
+    pub fn exclude_names(&self) -> Result<RegexSet, Fail> {
+        Ok(RegexSet::new(&self.exclude_names).err_msg("failed parse 'exclude'")?)
     }
-    fn shipyard(&self) -> bool {
-        self.shipyard
-    }
-    fn outfitting(&self) -> bool {
-        self.outfitting
+
+    pub fn exclude_systems(&self) -> Result<RegexSet, Fail> {
+        Ok(RegexSet::new(&self.exclude_systems).err_msg("failed parse 'exclude_systems'")?)
     }
 }
 
@@ -156,8 +203,4 @@ impl Default for Origin {
     fn default() -> Origin {
         Origin::Current
     }
-}
-
-fn default_true() -> bool {
-    true
 }

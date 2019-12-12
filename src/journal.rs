@@ -13,17 +13,19 @@ use crate::coords::Coords;
 
 const VISITED_VIEW_FILES: usize = 50;
 
-pub fn sol_origin() -> Result<(Location, HashSet<u64>), Fail> {
+pub type GetLocFunc = fn() -> Result<(Location, Visited), Fail>;
+
+pub fn sol_origin() -> Result<(Location, Visited), Fail> {
     let (_, visited) = load_current_location()?;
 
     Ok((sol(), visited))
 }
 
-pub fn load_current_location() -> Result<(Location, HashSet<u64>), Fail> {
+pub fn load_current_location() -> Result<(Location, Visited), Fail> {
     if let Some(journal_files) = journal_files()? {
         load_location_from_file(journal_files)
     } else {
-        Ok((sol(), HashSet::new()))
+        Ok((sol(), Visited::new()))
     }
 }
 
@@ -34,13 +36,11 @@ fn sol() -> Location {
     }
 }
 
-fn load_location_from_file(
-    mut journal_files: Vec<PathBuf>,
-) -> Result<(Location, HashSet<u64>), Fail> {
+fn load_location_from_file(mut journal_files: Vec<PathBuf>) -> Result<(Location, Visited), Fail> {
     let mut buf = String::new();
 
     let mut location = Option::<Location>::None;
-    let mut visited_stations = HashSet::<u64>::new();
+    let mut visited = Visited::new();
 
     while let Some(file_path) = journal_files.pop() {
         let f = File::open(&file_path)?;
@@ -58,7 +58,7 @@ fn load_location_from_file(
                 Event::Location(loc) => location = Some(loc),
                 Event::FSDJump(loc) => location = Some(loc),
                 Event::Docked(docked) => {
-                    visited_stations.insert(docked.market_id);
+                    visited.add(docked.market_id);
                 }
                 _ => {}
             }
@@ -88,57 +88,57 @@ fn load_location_from_file(
             let event: Event = from_str(&buf).map_err(|e| Fail::new(format!("{}: {}", e, buf)))?;
             buf.truncate(0);
             if let Event::Docked(docked) = event {
-                visited_stations.insert(docked.market_id);
+                visited.add(docked.market_id);
             }
         }
     }
 
     if let Some(loc) = location {
-        Ok((loc, visited_stations))
+        Ok((loc, visited))
     } else {
-        Ok((sol(), HashSet::new()))
+        Ok((sol(), Visited::new()))
     }
 }
 
 fn journal_files() -> Result<Option<Vec<PathBuf>>, Fail> {
-    let journal_dir = journal_dir()?;
-    if !journal_dir.exists() {
-        return Ok(None);
+    if let Some(journal_dir) = journal_dir() {
+        if !journal_dir.exists() {
+            return Ok(None);
+        }
+        let journal_regex = Regex::new(r"^Journal\.\d{12}\.\d{2}\.log$")?;
+        let journal_files = journal_dir
+            .read_dir()?
+            .filter_map(|f| f.ok())
+            .map(|f| f.path())
+            .filter(|p| {
+                if let Some(n) = p.file_name().and_then(|n| n.to_str()) {
+                    return journal_regex.is_match(n);
+                }
+                false
+            })
+            .collect();
+        Ok(Some(journal_files))
+    } else {
+        Ok(None)
     }
-
-    let journal_regex = Regex::new(r"^Journal\.\d{12}\.\d{2}\.log$")?;
-
-    let journal_files = journal_dir
-        .read_dir()?
-        .filter_map(|f| f.ok())
-        .map(|f| f.path())
-        .filter(|p| {
-            if let Some(n) = p.file_name().and_then(|n| n.to_str()) {
-                return journal_regex.is_match(n);
-            }
-            false
-        })
-        .collect();
-
-    Ok(Some(journal_files))
 }
 
-fn journal_dir() -> Result<PathBuf, Fail> {
-    let home = var("USERPROFILE")?;
-    let journal_dir = Path::new(&home).join(r"Saved Games\Frontier Developments\Elite Dangerous");
-    if !journal_dir.exists() {
-        return Err(Fail::new(format!(
-            "'{}' is not exists.",
-            journal_dir.to_string_lossy()
-        )));
+fn journal_dir() -> Option<PathBuf> {
+    if let Ok(home) = var("USERPROFILE") {
+        let journal_dir = Path::new(&home)
+            .join("Saved Games")
+            .join("Frontier Developments")
+            .join("Elite Dangerous");
+        if !journal_dir.exists() {
+            return None;
+        }
+        if !journal_dir.is_dir() {
+            return None;
+        }
+        Some(journal_dir)
+    } else {
+        None
     }
-    if !journal_dir.is_dir() {
-        return Err(Fail::new(format!(
-            "'{}' is not dir.",
-            journal_dir.to_string_lossy()
-        )));
-    }
-    Ok(journal_dir)
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize)]
@@ -156,6 +156,27 @@ enum Event {
 pub struct Location {
     pub star_system: String,
     pub star_pos: Coords,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Visited {
+    visited: HashSet<u64>,
+}
+
+impl Visited {
+    fn new() -> Visited {
+        Visited {
+            visited: HashSet::new(),
+        }
+    }
+
+    fn add(&mut self, id: u64) {
+        self.visited.insert(id);
+    }
+
+    pub fn is_visited(&self, id: u64) -> bool {
+        self.visited.contains(&id)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize)]
