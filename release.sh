@@ -1,16 +1,17 @@
 #!/bin/bash
 
 rm -r near-old-stations || true
-rm -r *.gz || true
-rm -r .cache.json || true
 
 set -eu
 
+cargo clean
+make check
+
 mkdir near-old-stations
 
-cargo clean -p near-old-stations
-cargo r --release -- --mode oneshot
 cargo package
+cargo b --release
+cargo r --release -- --mode oneshot
 
 cp target/release/near-old-stations.exe near-old-stations/
 cp target/release/stats.exe near-old-stations/
