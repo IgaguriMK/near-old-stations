@@ -33,5 +33,17 @@ outfitting = 700
 exclude_systems = []
 
 # 除外対象とするステーション名の正規表現
-# 救助船の古いエントリが残っているため、除外している
-excludes = ["^Rescue Ship - "]
+exclude_names = []
+
+# # ステーションの産業の指定
+# [filter.economy]
+# list = ["Refinery"]
+# include_secondary = false
+
+# # パッドサイズの指定
+# [filter.pad_size]
+# l_pad_only = true
+
+# # 地上基地を含むか
+# [filter.planetary]
+# include = false

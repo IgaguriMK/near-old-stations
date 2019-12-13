@@ -185,8 +185,10 @@ pub struct Station {
     #[serde(default)]
     pub coords: Coords,
     pub distance_to_arrival: Option<f64>,
+    pub economy: Option<Economy>,
     pub market_id: Option<u64>,
     pub name: String,
+    pub second_economy: Option<Economy>,
     #[serde(rename = "type")]
     pub st_type: StationType,
     pub system_id: u64,
@@ -231,7 +233,7 @@ impl UpdateTime {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Deserialize)]
 pub enum StationType {
     // Orbital Large
     #[serde(rename = "Ocellus Starport")]
@@ -253,6 +255,23 @@ pub enum StationType {
     PlanetaryOutpost,
 }
 
+impl StationType {
+    pub fn has_l_pad(self) -> bool {
+        match self {
+            StationType::Outpost => false,
+            _ => true,
+        }
+    }
+
+    pub fn is_planetary(self) -> bool {
+        match self {
+            StationType::PlanetaryPort => true,
+            StationType::PlanetaryOutpost => true,
+            _ => false,
+        }
+    }
+}
+
 impl fmt::Display for StationType {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
@@ -266,4 +285,22 @@ impl fmt::Display for StationType {
             StationType::PlanetaryOutpost => write!(f, "PlanetaryOutpost"),
         }
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Deserialize)]
+pub enum Economy {
+    Agriculture,
+    Colony,
+    Extraction,
+    #[serde(rename = "High Tech")]
+    HighTech,
+    Industrial,
+    Military,
+    Prison,
+    Refinery,
+    Repair,
+    Rescue,
+    Service,
+    Terraforming,
+    Tourism,
 }

@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::fs::File;
 use std::io::Read;
 
@@ -10,6 +11,7 @@ use toml::from_slice;
 use crate::filter::{Days, Filter, Filters};
 use crate::journal::{load_current_location, sol_origin, GetLocFunc};
 use crate::mode;
+use crate::stations::Economy;
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct Config {
@@ -154,31 +156,6 @@ impl OutdatedDays {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Deserialize)]
-pub struct FilterConfig {
-    #[serde(default)]
-    pub exclude_names: Vec<String>,
-    #[serde(default)]
-    pub exclude_systems: Vec<String>,
-}
-
-impl FilterConfig {
-    fn filter(&self, filters: &mut Filters) -> Result<(), Fail> {
-        filters.add(Filter::StationName(self.exclude_names()?));
-        filters.add(Filter::SystemName(self.exclude_systems()?));
-
-        Ok(())
-    }
-
-    pub fn exclude_names(&self) -> Result<RegexSet, Fail> {
-        Ok(RegexSet::new(&self.exclude_names).err_msg("failed parse 'exclude'")?)
-    }
-
-    pub fn exclude_systems(&self) -> Result<RegexSet, Fail> {
-        Ok(RegexSet::new(&self.exclude_systems).err_msg("failed parse 'exclude_systems'")?)
-    }
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Mode {
@@ -202,5 +179,89 @@ pub enum Origin {
 impl Default for Origin {
     fn default() -> Origin {
         Origin::Current
+    }
+}
+
+/* Filters */
+
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+pub struct FilterConfig {
+    #[serde(default)]
+    pub exclude_names: Vec<String>,
+    #[serde(default)]
+    pub exclude_systems: Vec<String>,
+
+    economy: Option<EconomyFilter>,
+    pad_size: Option<PadSize>,
+    planetary: Option<Planetary>,
+}
+
+impl FilterConfig {
+    fn filter(&self, filters: &mut Filters) -> Result<(), Fail> {
+        filters.add(Filter::StationName(self.exclude_names()?));
+        filters.add(Filter::SystemName(self.exclude_systems()?));
+
+        if let Some(ref f) = self.economy {
+            f.filter(filters)?;
+        }
+        if let Some(ref f) = self.pad_size {
+            f.filter(filters)?;
+        }
+        if let Some(ref f) = self.planetary {
+            f.filter(filters)?;
+        }
+
+        Ok(())
+    }
+
+    pub fn exclude_names(&self) -> Result<RegexSet, Fail> {
+        Ok(RegexSet::new(&self.exclude_names).err_msg("failed parse 'exclude'")?)
+    }
+
+    pub fn exclude_systems(&self) -> Result<RegexSet, Fail> {
+        Ok(RegexSet::new(&self.exclude_systems).err_msg("failed parse 'exclude_systems'")?)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+struct EconomyFilter {
+    list: Vec<Economy>,
+    #[serde(default)]
+    include_secondary: bool,
+}
+
+impl EconomyFilter {
+    fn filter(&self, filters: &mut Filters) -> Result<(), Fail> {
+        let set: HashSet<Economy> = self.list.iter().cloned().collect();
+        filters.add(Filter::Economy(set, self.include_secondary));
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+struct PadSize {
+    l_pad_only: bool,
+}
+
+impl PadSize {
+    fn filter(&self, filters: &mut Filters) -> Result<(), Fail> {
+        if self.l_pad_only {
+            filters.add(Filter::LPadOnly);
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+struct Planetary {
+    include: bool,
+}
+
+impl Planetary {
+    fn filter(&self, filters: &mut Filters) -> Result<(), Fail> {
+        if !self.include {
+            filters.add(Filter::IgnorePlanetary);
+        }
+        Ok(())
     }
 }

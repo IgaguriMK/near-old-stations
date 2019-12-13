@@ -1,6 +1,9 @@
+use std::collections::HashSet;
+
 use regex::RegexSet;
 
 use crate::searcher::{self, Record};
+use crate::stations::Economy;
 
 #[derive(Debug, Default, Clone)]
 pub struct Filters(Vec<Filter>);
@@ -30,6 +33,9 @@ impl searcher::Filter for Filters {
 pub enum Filter {
     Days(Days),
     Dist(f64),
+    Economy(HashSet<Economy>, bool),
+    IgnorePlanetary,
+    LPadOnly,
     Outdated,
     StationName(RegexSet),
     SystemName(RegexSet),
@@ -40,6 +46,21 @@ impl searcher::Filter for Filter {
         match self {
             Filter::Days(days) => days.filter(record),
             Filter::Dist(dist) => record.distance <= *dist,
+            Filter::Economy(list, include_secondary) => {
+                if let Some(economy) = record.station.economy {
+                    if list.contains(&economy) {
+                        return true;
+                    }
+                }
+                if let Some(second) = record.station.second_economy {
+                    if *include_secondary && list.contains(&second) {
+                        return true;
+                    }
+                }
+                false
+            }
+            Filter::IgnorePlanetary => !record.station.st_type.is_planetary(),
+            Filter::LPadOnly => record.station.st_type.has_l_pad(),
             Filter::Outdated => check_outdated(record),
             Filter::StationName(rs) => !rs.is_match(&record.station.name),
             Filter::SystemName(rs) => !rs.is_match(&record.station.system_name),
