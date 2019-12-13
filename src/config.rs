@@ -191,6 +191,7 @@ pub struct FilterConfig {
     #[serde(default)]
     pub exclude_systems: Vec<String>,
 
+    distance_to_arrival: Option<DistanceToArrival>,
     economy: Option<EconomyFilter>,
     pad_size: Option<PadSize>,
     planetary: Option<Planetary>,
@@ -201,6 +202,9 @@ impl FilterConfig {
         filters.add(Filter::StationName(self.exclude_names()?));
         filters.add(Filter::SystemName(self.exclude_systems()?));
 
+        if let Some(ref f) = self.distance_to_arrival {
+            f.filter(filters)?;
+        }
         if let Some(ref f) = self.economy {
             f.filter(filters)?;
         }
@@ -220,6 +224,18 @@ impl FilterConfig {
 
     pub fn exclude_systems(&self) -> Result<RegexSet, Fail> {
         Ok(RegexSet::new(&self.exclude_systems).err_msg("failed parse 'exclude_systems'")?)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+struct DistanceToArrival {
+    max: f64,
+}
+
+impl DistanceToArrival {
+    fn filter(&self, filters: &mut Filters) -> Result<(), Fail> {
+        filters.add(Filter::DistToArrival(self.max));
+        Ok(())
     }
 }
 

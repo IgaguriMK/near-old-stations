@@ -35,6 +35,10 @@ exclude_systems = []
 # 除外対象とするステーション名の正規表現
 exclude_names = []
 
+# # 星系内の最大距離
+# [filter.distance_to_arrival]
+# max = 1000.0
+
 # # ステーションの産業の指定
 # [filter.economy]
 # list = ["Refinery"]

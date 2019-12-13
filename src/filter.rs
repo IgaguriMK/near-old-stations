@@ -33,6 +33,7 @@ impl searcher::Filter for Filters {
 pub enum Filter {
     Days(Days),
     Dist(f64),
+    DistToArrival(f64),
     Economy(HashSet<Economy>, bool),
     IgnorePlanetary,
     LPadOnly,
@@ -46,6 +47,13 @@ impl searcher::Filter for Filter {
         match self {
             Filter::Days(days) => days.filter(record),
             Filter::Dist(dist) => record.distance <= *dist,
+            Filter::DistToArrival(dist) => {
+                if let Some(d) = record.station.distance_to_arrival {
+                    d <= *dist
+                } else {
+                    false
+                }
+            }
             Filter::Economy(list, include_secondary) => {
                 if let Some(economy) = record.station.economy {
                     if list.contains(&economy) {
