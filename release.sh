@@ -8,11 +8,13 @@ set -eu
 
 mkdir near-old-stations
 
+cargo clean -p near-old-stations
 cargo r --release -- --mode oneshot
 cargo package
 
 cp target/release/near-old-stations.exe near-old-stations/
 cp target/release/stats.exe near-old-stations/
+cp target/package/near-old-stations*.crate near-old-stations/
 cp LICENSE-APACHE near-old-stations/
 cp LICENSE-MIT near-old-stations/
 cp README.md near-old-stations/
