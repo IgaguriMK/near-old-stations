@@ -51,7 +51,7 @@ impl Printer for TextPrinter {
             });
 
             println!(
-                "{:>3}{:<2}{:>6.2} Ly + {:>8} Ls  {}d [{}]  {:<25} {:<12} ({})",
+                "{:>3}{:<2}{:>6.2} Ly + {:>8} Ls  {:3}d [{}]  {:<25} {:<12} ({})",
                 i + 1,
                 if r.visited { "*" } else { " " },
                 r.distance,
