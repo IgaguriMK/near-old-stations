@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 use std::fs::File;
-use std::io::{self, Write};
+use std::io::{self, BufWriter, Write};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
@@ -42,7 +42,7 @@ impl Downloader {
             .build()?;
 
         let head_client = Client::builder()
-            .default_headers(default_headers.clone())
+            .default_headers(default_headers)
             .connect_timeout(Some(Duration::from_secs(TIMEOUT_SECS)))
             .gzip(false)
             .build()?;
@@ -110,7 +110,11 @@ impl Downloader {
 
         prog_bar.set_message(file_name.trim_end_matches(".json.gz"));
         let f = File::create(file_name)?;
-        let mut w = ProgressWriter::new(GzEncoder::new(f, Compression::best()), prog_bar);
+        let mut w: ProgressWriter<Box<dyn Write>> = if file_name.ends_with(".gz") {
+            ProgressWriter::new(Box::new(BufWriter::new(f)), prog_bar)
+        } else {
+            ProgressWriter::new(Box::new(GzEncoder::new(f, Compression::best())), prog_bar)
+        };
 
         res.copy_to(&mut w)?;
         let prog_bar = w.finalize()?;

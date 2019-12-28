@@ -1,11 +1,12 @@
 # 更新履歴
 
-## Unreleased Version 0.3.1
+## Version 0.3.1
 
 * フィルタの追加
     - 星系内距離（Distance to Arrival）の最大値
 * 修正
     - 情報の古さが100日未満のとき表示が崩れる問題を修正
+    - EDSMのダンプデータリンク変更追従
 
 ## Version 0.3.0
 

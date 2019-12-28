@@ -21,10 +21,10 @@ use tiny_fail::{ErrorMessageExt, Fail};
 use crate::coords::Coords;
 use download::Downloader;
 
-const SYTEMS_DUMP_URL: &str = "https://www.edsm.net/dump/systemsPopulated.json";
+const SYTEMS_DUMP_URL: &str = "https://www.edsm.net/dump/systemsPopulated.json.gz";
 const SYTEMS_DUMP_FILE: &str = "systemsPopulated.json.gz";
 const SYTEMS_COORDS_FILE: &str = "coordinates.json.gz";
-const STATIONS_DUMP_URL: &str = "https://www.edsm.net/dump/stations.json";
+const STATIONS_DUMP_URL: &str = "https://www.edsm.net/dump/stations.json.gz";
 const STATIONS_DUMP_FILE: &str = "stations.json.gz";
 
 pub fn load_stations() -> Result<Stations, Fail> {
